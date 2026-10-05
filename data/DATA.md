@@ -40,7 +40,7 @@ examples only.
 Setup on a new machine:
 
 ```bash
-git clone git@github.com:PeterFriedrich/drive-landscape-data.git data/raw/private
+git clone https://github.com/PeterFriedrich/drive-landscape-data.git data/raw/private
 ```
 
 ## Drive inventory (`src/inventory.py`)
