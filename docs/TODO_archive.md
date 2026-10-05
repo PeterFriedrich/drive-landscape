@@ -7,3 +7,5 @@ Closed work moved out of `TODO.md` so the file that is read at the start of **ev
 Items are verbatim as they were closed, newest-moved first in the order they appeared in `TODO.md`. Line numbers and "next up" markers inside them are historical — do not act on them.
 
 ---
+
+- [x] **Guard the public/private split** — `scripts/check_no_private_data.py`, run by `.githooks/pre-commit` and `tests/test_no_private_data.py`; blocks data paths, data-shaped and credential files, large files and Drive links. Verified 2026-10-05 by a deliberate leak the hook refused.

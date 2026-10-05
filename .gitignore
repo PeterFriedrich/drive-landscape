@@ -35,3 +35,8 @@ node_modules/
 
 # Claude Code personal settings (per-machine permission grants)
 .claude/settings.local.json
+
+# OAuth client and token (kept in ~/.config/drive-landscape/, never here)
+credentials.json
+token.json
+client_secret*.json

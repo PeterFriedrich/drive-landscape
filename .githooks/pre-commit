@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Blocks a commit that would put Drive data, credentials or a Drive link into
+# this (public, code-only) repo. Needs: git config core.hooksPath .githooks
+# Unlike pre-push this fails CLOSED: a leak into public history is worse than a
+# blocked commit. Escape hatch: git commit --no-verify.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+py="$root/.venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3.12 || command -v python3)"
+exec "$py" "$root/scripts/check_no_private_data.py" --staged

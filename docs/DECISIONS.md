@@ -19,4 +19,4 @@ locks, add a row; when one is superseded, strike it (`~~...~~`) or mark it
 
 | When | Decision | Full reasoning |
 |------|----------|----------------|
-| 2026-10-05 | Code in this repo (to go public), all Drive-derived data in the private repo `drive-landscape-data` cloned at the gitignored `data/raw/private/`; nothing read from Drive goes in a tracked file. Rejected: one private repo holding both (owner wants the project public). `[unverifiable]` until a tracked-file guard exists. | `data/DATA.md` |
+| 2026-10-05 | Code in this repo (to go public), all Drive-derived data in the private repo `drive-landscape-data` cloned at the gitignored `data/raw/private/`; nothing read from Drive goes in a tracked file. Rejected: one private repo holding both (owner wants the project public). Guarded by `check_no_private_data.py` (pre-commit hook and `test_repo_tracks_no_private_data`): paths, data-shaped and credential files, size, Drive links. It cannot recognise a private name or todo text typed into a doc. | `data/DATA.md` |

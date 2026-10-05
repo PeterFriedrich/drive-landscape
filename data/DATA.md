@@ -37,6 +37,13 @@ Everything read from Drive counts as private: file and folder names, ids, doc
 text, todo items, embeddings and label files. Tracked files here use made-up
 examples only.
 
+Guard: `scripts/check_no_private_data.py` refuses anything under `data/` or
+`output/` beyond the placeholders, data-shaped and credential files, files over
+500 KB, and Google Drive / Docs links. `.githooks/pre-commit` runs it on every
+commit (enabled by `./bootstrap.sh`, which sets `core.hooksPath`), and
+`tests/test_no_private_data.py` runs it on the merge gate. It cannot recognise
+a private file name or todo text typed into a doc — that part is on the author.
+
 Setup on a new machine:
 
 ```bash
