@@ -23,7 +23,7 @@ version of the old one.
    replaces.
 
 "Grouped by sentiment" is read here as **grouped by meaning / theme**, not by
-positive-or-negative mood (§9, question 1).
+positive-or-negative mood (owner, 2026-10-05; §9, question 1).
 
 **Not in phase 1:** matching across documents, the Drive inventory and graph,
 Drive clean-up, writing back to Google Docs or Reminders, more than one user.
@@ -206,9 +206,9 @@ UI, not in the exported file.
 
 ## 9. For the owner to decide
 
-1. **"Sentiment"** — is grouping by theme / meaning what you meant? Or do you
-   also want a second axis, such as the *kind* of item (task, idea, someday,
-   thing to buy, reference) or its tone (urgent, nagging, wishful)?
+1. **"Sentiment"** — **answered 2026-10-05:** it means theme / meaning. Theme
+   is the only axis for now; no second label for the *kind* of item (task,
+   idea, someday, thing to buy, reference) or its tone.
 2. **Which end of the Reminders list is older** — and does older mean
    "long-standing, matters" or "probably stale"? It changes what the UI
    highlights.
