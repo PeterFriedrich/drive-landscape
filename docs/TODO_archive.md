@@ -8,4 +8,6 @@ Items are verbatim as they were closed, newest-moved first in the order they app
 
 ---
 
+- [x] **Before the repo goes public** — history rewritten and the GitHub repo recreated from it on 2026-10-05; the owner accepted what stays visible (commit author email, `Claude-Session:` lines, names of the data repo and sibling projects) and the repo was made public the same day. `drive-landscape-data` stays private.
+
 - [x] **Guard the public/private split** — `scripts/check_no_private_data.py`, run by `.githooks/pre-commit` and `tests/test_no_private_data.py`; blocks data paths, data-shaped and credential files, large files and Drive links. Verified 2026-10-05 by a deliberate leak the hook refused.
