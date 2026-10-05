@@ -42,3 +42,20 @@ Setup on a new machine:
 ```bash
 git clone git@github.com:PeterFriedrich/drive-landscape-data.git data/raw/private
 ```
+
+## Drive inventory (`src/inventory.py`)
+
+`python -m src.inventory` writes `data/raw/private/inventory/<date>/files.jsonl.gz`
+(one Drive API `files` resource per line, folders included, trashed included)
+and `manifest.json` (counts: total, folders, owned / not owned, trashed, no
+parent, parent not in inventory, bytes, per MIME type).
+
+Auth: put the OAuth client file (Google Cloud Console → Desktop app, Drive API
+enabled) at `~/.config/drive-landscape/credentials.json`. The first run opens a
+browser for consent and caches `token.json` beside it. Scope is
+`drive.readonly`. Override the directory with `--config-dir` or
+`DRIVE_LANDSCAPE_CONFIG`.
+
+Quirks to expect: a file can have no `parents` (shared with the owner one file
+at a time, or orphaned); `size` is absent for Google Docs/Sheets/Slides and
+folders, so `bytes` undercounts them.
