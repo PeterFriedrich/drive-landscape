@@ -10,6 +10,11 @@ symptom and re-measure the stated cause before acting on it.
 
 ## Open work
 
-- [ ] <first item — what, why, how you'll know it's done>
+- [ ] **Decide how the pipeline reads Drive** — the claude.ai Drive connector works in-session but returns small pages into context; a full inventory needs the Drive API from Python (OAuth token on this box). Done when a script can list every file's metadata without a model in the loop.
+- [ ] **Inventory Drive** — one row per file (id, title, mimeType, parent, owner, created/modified/viewed, size) to `data/raw/`; rebuild the folder tree. Done when row count matches Drive's own total and orphans/shared files are counted, not dropped.
+- [ ] **Find the todo lists** — a title search finds only a handful; a keyword search of doc text over-matches (100+ docs, mostly notes and reports), so candidates need a content pass. Done when the owner has confirmed the candidate set.
+- [ ] **Extract and consolidate todo items** — split lists into items, match duplicates/near-duplicates across lists (text similarity + embeddings; reuse the `edmonton-permit-speed` approach and its hand-labelling artifact — asked that session 2026-10-05), hand-label a test set to score methods. Done when there is one merged list with every source item accounted for.
+- [ ] **Map the Drive** — embed file titles/content, lay out for exploration (sibling: `edmonton-open-data-landscape`). Done when the owner can browse it and spot clusters.
+- [ ] **Clean up Drive** — propose moves/merges/trash from the map; owner approves each batch before anything changes.
 
 ## Done
