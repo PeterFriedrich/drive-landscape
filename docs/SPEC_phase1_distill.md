@@ -34,8 +34,7 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
   torch, no database server, no vector database, no Node build, no pandas.
 - **The agent does the judgement; the algorithm only proposes.** With an agent
   in the loop, embeddings need to be good enough to put likely-related items
-  next to each other — not good enough to be trusted alone. That is what makes
-  a small model sufficient.
+  next to each other — not good enough to be trusted alone.
 - **Files are the interface.** State is plain text files in the private data
   repo. The agent's commands and the owner's UI are two front ends over the
   same functions and the same files.
@@ -51,19 +50,22 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
 | Language | Python 3.12, standard library first | already the repo's language | — |
 | Text → items | `pdfplumber` for Reminders PDFs (exists); a Markdown / plain-text reader written here | no new dependency for the common case | pandoc, unstructured — heavy |
 | Word similarity | TF-IDF, 1–2-grams (`scikit-learn`) | instant; catches shared rare words and names | — |
-| Meaning similarity | **`model2vec`** static embeddings (a ~30 MB model, numpy only at run time) | made for CPU-only machines; no ONNX or torch | `fastembed` + bge-small as the default — kept as an **optional** comparison; `sentence-transformers` — needs torch |
+| Meaning similarity | **`BAAI/bge-small-en-v1.5` run locally through `fastembed`** (ONNX Runtime, no torch; fastembed downloads a quantised copy, about 65 MB) | the owner's choice, 2026-10-05: the same setup as `edmonton-open-data-landscape`, so results and code carry over; no need to go to a minimum-size model | `model2vec` static embeddings — smaller, but a second setup to learn for no stated need; `sentence-transformers` — needs torch |
 | Neighbours | brute-force cosine in `numpy` | a few thousand items is a few million multiplications | FAISS, a vector database |
 | Grouping | `scikit-learn` agglomerative clustering with a distance cut, at two levels (§5) | no group count to guess; leaves loners alone | k-means (needs k, forces every item into a group) |
 | State | JSON Lines files + an append-only decision log (§6) | diffable in git, safe for agent and owner to write at once, gives undo | SQLite — binary, not diffable |
 | Agent interface | a command-line tool with `--json` output, plus a project skill describing the routine | every Claude Code session can already run a command | an MCP server — more to run, nothing gained yet |
 | Owner UI | one static HTML page with plain JavaScript, served by a small standard-library server on `127.0.0.1` | no framework to install; also works from the server over an SSH tunnel | Streamlit (large install, awkward for regrouping); a hosted Claude artifact (the text would leave the machine) |
 
-New dependencies: `numpy`, `scikit-learn`, `model2vec`. *Target:* under about
-300 MB installed, under 1 GB of memory, and a 1,500-item document grouped in
-under a minute on the laptop. **None of this has been measured yet** — the
-first build task is to time TF-IDF, model2vec and (as a comparison) fastembed
-on the one real list we have, and to check the laptop can install them (§9,
-question 5).
+New dependencies: `numpy`, `scikit-learn`, `fastembed` (which brings
+`onnxruntime`). *Target:* under 1 GB of memory, and a 1,500-item document
+grouped in a few minutes at most on the laptop. **None of this has been
+measured here yet.** The one known figure is from the other project: about 4
+minutes for 920 texts on the server, but those were long texts cut at 512
+tokens; todo items are a sentence each and should be far quicker. The first
+build task is to time it on the one real list we have, and to check the laptop
+can install `onnxruntime` (§9, question 5). Vectors are cached per document, so
+the cost is paid once per document, not per session.
 
 ## 4. Ingest
 
@@ -206,8 +208,8 @@ UI, not in the exported file.
 
 ## 10. Build order
 
-1. Measure the three similarity options on the real list (time, memory,
-   install size); pick the default. Record it in `docs/DECISIONS.md`.
+1. Embed the real list with the chosen setup, copying the other project's
+   pins and call; measure time, memory and install size here and on the laptop.
 2. State: the log, replay, and the accounted-for check — with tests first.
 3. `propose`: two-level grouping; `status`, `groups`, `show`.
 4. Edit commands and `export`; the skill. At this point an agent can distil the
