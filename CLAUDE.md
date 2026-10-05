@@ -24,6 +24,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - `docs/CLAUDE_WEB.md` — **read before a Claude web research chat**: the generated brief (`scripts/make_brief.py`), claude.ai Project sync, the reply format. `docs/SCOPE.md` is its one hand-kept input. **A PR that changes a synced file (`docs/BRIEF.md`, `docs/SPEC_*.md`, `docs/ARCHITECTURE.md`, `data/DATA.md`) opens its description with "After merge: press Sync in the claude.ai Project."** — the web side cannot notice it is stale.
 - `docs/COPIER.md` — **read before pulling template changes** (`copier update`) or starting a project from the template.
 - `session-summary/` — session handoff notes. Read the latest before starting work; older ones live in `session-summary/archive/` (don't bulk-read them).
+- `docs/SPEC_phase1_distill.md` — **the current phase**: one document in, items grouped, agent reviews, owner confirms, distilled list out; stack, state files, agent commands, UI. Read before building any of it.
 - `docs/SPEC_drive_landscape.md` — what the project produces, the pipeline stages and their status, design notes, open questions. **Read before adding a pipeline stage or starting a research round.**
 
 ## Token Efficiency
