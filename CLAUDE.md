@@ -6,7 +6,11 @@
      derive from the code (layout, dependency lists) does not. -->
 
 ## Project
-Finds the owner's scattered todo lists (mostly Google Docs) and consolidates them into one deduplicated list, using text similarity and embeddings to match items across lists; then maps their Google Drive so it can be cleaned up. Private data: Drive contents and todo text stay in the gitignored `data/` and `output/` dirs, never in commits. Nothing in Drive is moved, trashed or edited without the owner approving that specific change.
+Finds the owner's scattered todo lists (mostly Google Docs) and consolidates them into one deduplicated list, matching items across lists with text similarity and embeddings; and maps their Google Drive as an interactive graph (first as the folder tree stands, then arranged by similarity of folders and files) so it can be cleaned up. Nothing in Drive is moved, trashed or edited without the owner approving that specific change.
+
+**This repo is code only and is meant to go public; all data lives in the private repo `PeterFriedrich/drive-landscape-data`, cloned at the gitignored `data/raw/private/`.** No file title, folder name, todo text, Drive id or anything else read from Drive goes in a tracked file here — not in code, tests, docs, TODO items, commit messages or PR text. Tests use made-up fixtures. Details: `data/DATA.md`.
+
+Usually run on the owner's Linux work laptop (room to install anything, e.g. torch); this server is tight on disk, so keep heavy dependencies optional.
 
 ## Key Files
 - `TODO.md` — living backlog and **the source of truth for progress**. Read it first to know what to work on; update it in place as items open/close. Session summaries narrate *what happened*; TODO.md owns *what's left*. Never redo a closed item without asking — its `## Done` section lists every closed item in one line each. Conversely, an *open* item can be stale — reproduce the symptom and re-measure the stated cause before acting on it. **When an item closes, move its body to `docs/TODO_archive.md` and leave a `## Done` line** (`python tools/todo_archive.py` does it in bulk) — this file is read every session, so it must hold live work, not history.

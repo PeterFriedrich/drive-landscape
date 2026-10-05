@@ -24,3 +24,21 @@ while the guard stays green.
 - **Rows / columns:**
 - **CRS (if spatial):**
 - **Quirks:**
+
+## Where the data lives
+
+Code is in this repo (meant to be public). Data is in the private repo
+`PeterFriedrich/drive-landscape-data`, cloned as a nested repo at
+`data/raw/private/`, which the `data/raw/*` rule in `.gitignore` keeps out of
+this repo. Derived outputs go to `data/processed/` and `output/`, also ignored;
+anything derived that is worth keeping is committed to the private repo, not here.
+
+Everything read from Drive counts as private: file and folder names, ids, doc
+text, todo items, embeddings and label files. Tracked files here use made-up
+examples only.
+
+Setup on a new machine:
+
+```bash
+git clone git@github.com:PeterFriedrich/drive-landscape-data.git data/raw/private
+```
