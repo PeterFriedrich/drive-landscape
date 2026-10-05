@@ -17,7 +17,7 @@ symptom and re-measure the stated cause before acting on it.
 - [ ] **Graph the Drive as it stands** — interactive graph of the folder tree (folders and files as nodes, containment as edges; size/age/type as visual channels). Done when the owner can pan, zoom, search and open any node's Drive link.
 - [ ] **Graph the Drive by similarity** — second layout arranging folders and files by text similarity (titles + content embeddings), so misfiled and duplicate material sits together regardless of folder. Nothing to copy from `edmonton-open-data-landscape` here: it has clustering only, no projection or front end. Done when the owner can switch between the two layouts on the same nodes.
 - [ ] **Guard the public/private split** — a test that fails if a tracked file sits under `data/` or `output/` (bar `.gitkeep`/`DATA.md`), so the DECISIONS row can cite it. Changes CI, so propose first.
-- [ ] **Before the repo goes public** — the first commits' `TODO.md` named three Drive doc titles; rewrite that history (or accept it) before flipping visibility, and tell `server` to drop "PRIVATE repo" from `/home/opc/CLAUDE.md`.
+- [ ] **Before the repo goes public** — history was rewritten 2026-10-05 to remove private text from early commits, but GitHub can still serve the old commits by SHA until it garbage-collects them. Safest: delete and recreate the GitHub repo from this clone (or ask GitHub Support to purge) before flipping visibility. Then tell `server` to drop "PRIVATE repo" from `/home/opc/CLAUDE.md`.
 - [ ] **Clean up Drive** — propose moves/merges/trash from the map; owner approves each batch before anything changes.
 
 ## Done
