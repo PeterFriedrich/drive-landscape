@@ -59,13 +59,31 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
 
 New dependencies: `numpy`, `scikit-learn`, `fastembed` (which brings
 `onnxruntime`). *Target:* under 1 GB of memory, and a 1,500-item document
-grouped in a few minutes at most on the laptop. **None of this has been
-measured here yet.** The one known figure is from the other project: about 4
-minutes for 920 texts on the server, but those were long texts cut at 512
-tokens; todo items are a sentence each and should be far quicker. The first
-build task is to time it on the one real list we have, and to check the laptop
-can install `onnxruntime` (§9, question 5). Vectors are cached per document, so
+grouped in a few minutes at most on the laptop. **Not measured on the laptop yet.** On the server
+(4 ARM cores) the other project timed 1,400 texts of about 60 characters at
+7.8 seconds, roughly 180 a second; its earlier 4 minutes for 920 texts came
+from long descriptions at the 512-token cut. The first build task is to
+repeat that on the one real list we have, and to check the laptop can install
+`onnxruntime` (§9, question 5). Vectors are cached per document, so
 the cost is paid once per document, not per session.
+
+Setup, copied from `edmonton-open-data-landscape` so the two match:
+
+- `fastembed==0.8.1` (it brought `onnxruntime` 1.30.0 there); model name
+  `BAAI/bge-small-en-v1.5`, which fastembed maps to a quantised file by default;
+  384 dimensions; all other arguments left at their defaults.
+- `cache_dir` set to `~/.cache/fastembed` — fastembed's own default is a
+  temporary directory that can be wiped. The same directory is shared with the
+  other project on the server, so nothing is downloaded twice.
+- Every text embedded the same way, with no query / passage prefix: this is
+  item-to-item matching, not short queries against long passages.
+- One process; ONNX Runtime already uses every core, so no parallel setting.
+- The embed function is passed in, so tests need neither fastembed nor a
+  download.
+- Vectors differ slightly between machines (ARM server, x86 laptop). Fine for
+  neighbours; never compare or cache raw vectors across machines.
+- No model has been compared against bge-small in either project. If it falls
+  short, the next thing to try is `bge-base`.
 
 ## 4. Ingest
 
