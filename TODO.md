@@ -17,11 +17,12 @@ symptom and re-measure the stated cause before acting on it.
 - [ ] **Extract and consolidate todo items** — split lists into items, match duplicates/near-duplicates across lists (text similarity + embeddings; reuse `~/edmonton-open-data-landscape` (confirmed its work 2026-10-05): `src/similarity.py` (TF-IDF), `src/embeddings.py` (fastembed + bge-small-en-v1.5, local, no torch — disk is tight), `src/spotcheck.py` (sample/extend/score label pairs) and its labelling artifact (db capability, `labels` collection, read back with ArtifactData). Its lessons: run all signals from the start and sample label pairs from all of them at once; include pairs the signals rank differently, not only top-5 (top-5 is nearly all "yes" and can't separate methods); strip shared boilerplate before embedding), hand-label a test set to score methods. Done when there is one merged list with every source item accounted for.
 - [ ] **Graph the Drive as it stands** — interactive graph of the folder tree (folders and files as nodes, containment as edges; size/age/type as visual channels). Done when the owner can pan, zoom, search and open any node's Drive link.
 - [ ] **Graph the Drive by similarity** — second layout arranging folders and files by text similarity (titles + content embeddings), so misfiled and duplicate material sits together regardless of folder. Nothing to copy from `edmonton-open-data-landscape` here: it has clustering only, no projection or front end. Done when the owner can switch between the two layouts on the same nodes.
-- [ ] **Before the repo goes public** — history was rewritten and the GitHub repo recreated from it on 2026-10-05, so the old commits are gone from `drive-landscape` (the pre-rewrite copy is the private backup `drive-landscape-old`, which the owner deletes when satisfied). Left for the owner: decide whether the `Claude-Session:` lines in commit messages and the mentions of the private data repo and sibling sessions may be public, then flip visibility. `server` updates `/home/opc/CLAUDE.md` when it does.
 - [ ] **Clean up Drive** — propose moves/merges/trash from the map; owner approves each batch before anything changes.
 
 ## Done
 
 Closed items moved out of `## Open work` live in **`docs/TODO_archive.md`** — one line each below, reasoning there.
+
+- [x] **Before the repo goes public** — 2026-10-05 · `docs/TODO_archive.md`
 
 - [x] **Guard the public/private split** — 2026-10-05 · `docs/TODO_archive.md`
