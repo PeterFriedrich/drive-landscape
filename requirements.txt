@@ -5,3 +5,5 @@ copier==9.18.2
 # Drive API (src/inventory.py). Not in requirements-ci.txt: tests use a fake service.
 google-api-python-client==2.201.0
 google-auth-oauthlib==1.5.0
+# PDF text and layout (src/reminders_pdf.py). MIT. Not in requirements-ci.txt: tests use made-up layouts.
+pdfplumber==0.11.10
