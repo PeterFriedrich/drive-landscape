@@ -1,0 +1,4 @@
+# What the merge gate installs. Keep it to what tests/ and scripts/check_*.py
+# need; pin exact versions and bump in lockstep with requirements.txt.
+pytest==9.0.3
+copier==9.18.2

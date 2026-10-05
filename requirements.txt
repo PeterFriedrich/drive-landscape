@@ -1,0 +1,4 @@
+# Full local environment. requirements-ci.txt is the slim subset the merge gate
+# installs; keep the two in lockstep.
+pytest==9.0.3
+copier==9.18.2

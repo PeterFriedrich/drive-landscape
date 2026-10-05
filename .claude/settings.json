@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c '{t:(now|todateiso8601),tool:.tool_name,path:(.tool_input.file_path // .tool_input.path // null),q:(.tool_input.pattern // null),cwd:.cwd,sid:.session_id}' >> ~/.claude/retrieval-log.jsonl 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; { [ -x .venv/bin/python ] && .venv/bin/python scripts/handoff_gap.py --session-start || { command -v python3.12 >/dev/null && python3.12 scripts/handoff_gap.py --session-start || python3 scripts/handoff_gap.py --session-start; }; } 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; { [ -x .venv/bin/python ] && .venv/bin/python scripts/template_drift.py --session-start || { command -v python3.12 >/dev/null && python3.12 scripts/template_drift.py --session-start || python3 scripts/template_drift.py --session-start; }; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; { [ -x .venv/bin/python ] && .venv/bin/python scripts/handoff_gap.py --session-end || { command -v python3.12 >/dev/null && python3.12 scripts/handoff_gap.py --session-end || python3 scripts/handoff_gap.py --session-end; }; } || true"
+          }
+        ]
+      }
+    ]
+  }
+}

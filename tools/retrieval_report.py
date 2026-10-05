@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Per-doc read-frequency table from the PostToolUse retrieval log.
+
+The log is written by the `Read|Grep|Glob` hook in `.claude/settings.json`
+— one JSON line per tool call, with the path, the session id and a
+timestamp. This turns it into a table: which docs a session actually opens, how
+many distinct sessions opened each, and which were never opened.
+
+⚠️ A doc with zero reads is a PRUNE CANDIDATE, not a verdict. Three things make a
+zero honest-but-misleading: a doc read in a session that predates the hook, a doc
+whose content reached the model through CLAUDE.md, and — the big one — **a doc
+read through Bash.** The hook matches the `Read`, `Grep` and `Glob` TOOLS, so
+`bash grep`, `sed`, `cat`, `head` and `python` reads are invisible to it.
+The session that audited this instrument logged **4 reads while consulting
+~14 docs**; `DECISIONS.md` and `AUDIT_LEDGER.md` were both read via Bash and
+both scored zero. The undercount is not uniform — it falls hardest on the
+big files a session greps rather than opens, which are the ones a prune would
+target. The never-read list is where to look, not what to conclude.
+
+⚠️ Read the DATE RANGE before the counts. Under ~2 weeks of normal sessions the
+table settles nothing, and the report says so at the top rather than leaving the
+reader to notice.
+
+Usage::
+
+    python tools/retrieval_report.py                    # docs/ + *.md at root
+    python tools/retrieval_report.py --all              # every path logged
+    python tools/retrieval_report.py --log ~/other.jsonl
+"""
+import argparse
+import json
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_LOG = Path.home() / ".claude" / "retrieval-log.jsonl"
+# Below this the table cannot settle the question it was built for; the report
+# leads with the warning rather than printing counts that look like evidence.
+MIN_DAYS = 14
+
+
+def load(log_path: Path) -> list[dict]:
+    if not log_path.exists():
+        raise SystemExit(f"No retrieval log at {log_path} — is the hook installed?")
+    rows = []
+    for line in log_path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue  # a truncated final line mid-write is expected, not a fault
+    return rows
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--log", type=Path, default=DEFAULT_LOG)
+    ap.add_argument("--all", action="store_true", help="include non-doc paths")
+    ap.add_argument("--project", default=str(ROOT), help="filter by cwd prefix")
+    args = ap.parse_args()
+
+    rows = [r for r in load(args.log) if str(r.get("cwd", "")).startswith(args.project)]
+    if not rows:
+        raise SystemExit("Log has no entries for this project yet.")
+
+    stamps = sorted(r["t"] for r in rows if r.get("t"))
+    first, last = stamps[0], stamps[-1]
+    days = (datetime.fromisoformat(last.replace("Z", "+00:00"))
+            - datetime.fromisoformat(first.replace("Z", "+00:00"))).days
+    sessions = {r.get("sid") for r in rows}
+
+    print(f"Retrieval log: {len(rows)} calls, {len(sessions)} sessions, "
+          f"{first[:10]} → {last[:10]} ({days}d)")
+    if days < MIN_DAYS:
+        print(f"⚠️  ONLY {days} DAYS — under {MIN_DAYS} this table settles nothing. "
+              f"Report it as MEASUREMENT-PENDING.")
+    print()
+
+    # What a session is TOLD to read, in bytes. This is the cost a markdown:code
+    # ratio cannot see (in the source project 89% of it was TODO.md, which the
+    # ratio buried in 4.8 MB of markdown). Denominator-free, so it does not move
+    # when the code/not-code line moves. A measurement, not a ceiling.
+    handoffs = sorted((ROOT / "session-summary").glob("*.md"))
+    memory = (Path.home() / ".claude" / "projects"
+              / str(ROOT).replace("/", "-") / "memory"
+              / ("MEMORY" ".md"))  # split so check_doc_citations does not read a doc pointer
+    loaded = [p for p in (ROOT / "CLAUDE.md", ROOT / "TODO.md", *handoffs[-1:], memory)
+              if p.is_file()]
+    sizes = {p.name: p.stat().st_size for p in loaded}
+    total = sum(sizes.values())
+    parts = ", ".join(f"{n} {s // 1024} KB ({100 * s // total}%)"
+                      for n, s in sorted(sizes.items(), key=lambda kv: -kv[1]))
+    print(f"Loaded path (what a session is told to read): {total // 1024} KB — {parts}")
+    print()
+
+    reads = defaultdict(set)   # path -> session ids
+    counts = defaultdict(int)
+    for r in rows:
+        p = r.get("path")
+        if not p:
+            continue
+        rel = p[len(args.project):].lstrip("/") if p.startswith(args.project) else p
+        if not args.all and not (rel.startswith("docs/") or
+                                 (rel.endswith(".md") and "/" not in rel)):
+            continue
+        reads[rel].add(r.get("sid"))
+        counts[rel] += 1
+
+    print(f"{'reads':>6} {'sessions':>9}  path")
+    for path in sorted(counts, key=lambda p: (-len(reads[p]), -counts[p], p)):
+        print(f"{counts[path]:>6} {len(reads[path]):>9}  {path}")
+
+    if not args.all:
+        tracked = {str(p.relative_to(ROOT)) for p in ROOT.glob("docs/*.md")}
+        tracked |= {str(p.relative_to(ROOT)) for p in ROOT.glob("*.md")}
+        never = sorted(tracked - set(counts))
+        # The warning lives here, not only in the docstring: this list is the one
+        # a prune would act on, and a caveat the actor does not see is a guard on
+        # a channel nobody reads.
+        print(f"\n⚠️  A ZERO BELOW MAY MEAN 'READ THROUGH BASH', NOT 'NEVER READ'.")
+        print(f"    The hook sees the Read/Grep/Glob TOOLS only — `bash grep`, `sed`,")
+        print(f"    `cat` and `python` reads are invisible. The session that audited")
+        print(f"    this instrument logged 4 reads while consulting ~14 docs. Confirm a")
+        print(f"    zero against transcripts before treating it as evidence.")
+        print(f"\nNEVER OPENED in this window — {len(never)} of {len(tracked)}:")
+        for path in never:
+            print(f"       .         {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
