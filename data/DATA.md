@@ -66,3 +66,30 @@ browser for consent and caches `token.json` beside it. Scope is
 Quirks to expect: a file can have no `parents` (shared with the owner one file
 at a time, or orphaned); `size` is absent for Google Docs/Sheets/Slides and
 folders, so `bytes` undercounts them.
+
+## Todo lists (`data/raw/private/todo/`)
+
+One folder per list, under a neutral id (`todo-001`, …); `todo/manifest.json`
+maps each id to its original name, source app, date received and checksum. The
+real name stays in the manifest so that paths never carry it.
+
+Each folder keeps the **original file as received** plus what was extracted:
+
+- `items.jsonl` — one todo item per line: `n` (order in the list), `level`
+  (0 = top, 1 = subtask), `parent` (`n` of the item above it, or null), `text`,
+  `detail` (a date line under the item, or null), `bold`, `page`. This is what
+  the matching step reads.
+- `list.md` — the same list as a Markdown checklist, for reading and diffing.
+- `extract_summary.json` — the counts from the run.
+
+### Apple Reminders PDF (`src/reminders_pdf.py`)
+
+`python -m src.reminders_pdf LIST.pdf --out data/raw/private/todo/<id>`. The
+export has a real text layer (no OCR needed) and prints the list's own item
+count on page 1; the converter compares its item count with it and exits 1 if
+they differ, or if any line or marker was left unplaced.
+
+Quirks: **done / not-done is not recoverable** — the export draws every marker
+identically. A wrapped title and a title containing a line break look the same;
+both are joined with a space. A list's sections, if it has any, are not marked
+in a way seen so far (only one list has been converted).
