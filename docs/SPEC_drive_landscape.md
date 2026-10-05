@@ -4,6 +4,10 @@ Status: draft, 2026-10-05. Written from the scoping session; nothing here is
 locked unless `docs/DECISIONS.md` has a row for it. Examples are made up — this
 repo carries no real Drive names (see §7).
 
+**Order of work changed 2026-10-05:** the first thing to build is distilling
+one document at a time — `docs/SPEC_phase1_distill.md`. The Drive inventory,
+graph and cross-list matching below come after it.
+
 ## 1. Purpose
 
 One person's Google Drive has grown for years without upkeep. Two problems:

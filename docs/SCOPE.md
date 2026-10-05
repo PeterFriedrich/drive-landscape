@@ -16,4 +16,4 @@ no bullet here — the brief already carries `docs/DECISIONS.md`.
 - **Putting Drive data in this repo** — names, ids, text, vectors, labels and rendered graph data all live in the private data repo; this repo is code and is meant to be public. `data/DATA.md`.
 - **A hosted or multi-user service** — one user, run locally; the graph is a static page reading a local file.
 - **Driving the pipeline through a chat connector** — the claude.ai Drive connector returns results into the model's context and is too costly for a full inventory or text pull; the pipeline uses the Drive API from Python.
-- **Sending doc text to a hosted embedding or LLM API by default** — the text is personal; local processing is the baseline and anything else is the owner's call.
+- **A pipeline that calls a hosted embedding or LLM API** — the code runs offline with local models and no API keys. This does not cover agent sessions: a Claude Code session reading and grouping the text is part of the design (`docs/SPEC_phase1_distill.md` §7, §9 question 4).
