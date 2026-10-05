@@ -23,7 +23,7 @@ version of the old one.
    replaces.
 
 "Grouped by sentiment" is read here as **grouped by meaning / theme**, not by
-positive-or-negative mood (§9, question 1).
+positive-or-negative mood (owner, 2026-10-05; §9, question 1).
 
 **Not in phase 1:** matching across documents, the Drive inventory and graph,
 Drive clean-up, writing back to Google Docs or Reminders, more than one user.
@@ -39,7 +39,8 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
   repo. The agent's commands and the owner's UI are two front ends over the
   same functions and the same files.
 - **Every item is accounted for.** At any moment each source item is exactly
-  one of: in a group, kept on its own, dropped with a reason, or undecided. The
+  one of: in a group, kept on its own, marked done, dropped with a reason, or
+  undecided. The
   export states how many are still undecided.
 - **Nothing private in this repo** (`data/DATA.md`).
 
@@ -117,7 +118,9 @@ be promoted to an item. Nothing is deleted: an "out" section is recorded as out.
 which end is older (§9, question 2). Where a real date exists (an item's date
 line, a dated heading) it is used instead. Age is then shown everywhere: items
 in a group are listed oldest first, and each group shows its oldest item and
-how much of the document it spans. Age never removes anything by itself.
+how much of the document it spans. Age never removes anything by itself, and
+for now it implies nothing else: it is only how far back in the list an item
+sits (owner, 2026-10-05).
 
 ## 5. Grouping
 
@@ -156,7 +159,8 @@ todo/<id>/
 
 `log.jsonl` is the only thing the agent and the UI write. One line per
 decision: who (`agent` or `owner`), when, what (create / rename / merge / split
-a group, move an item, keep or drop an item with a reason, set a section in or
+a group, move an item, keep or drop an item with a reason, mark an item done,
+set a section in or
 out, set a group's distilled wording, mark a group for the owner, **confirm**).
 The current state is the log replayed from the top.
 
@@ -177,7 +181,7 @@ session never has to read a whole document into its context.
 | `sections <id>` | each section with its first guess, a few sample lines, in / out |
 | `groups <id> [--unreviewed] [--limit N]` | group summaries: size, age span, sample items |
 | `show <id> <group>` | one group's items in age order, with their nearest outside neighbours |
-| `rename`, `merge`, `split`, `move`, `keep`, `drop`, `section`, `draft`, `flag` | the edits, each one log line |
+| `rename`, `merge`, `split`, `move`, `keep`, `drop`, `done`, `section`, `draft`, `flag` | the edits, each one log line |
 | `export <id>` | write `distilled.md`; report what is still undecided |
 
 A project skill gives the routine: check status → settle sections → go through
@@ -200,27 +204,32 @@ For final checks, not for doing the sorting by hand.
 
 **The new list** (`distilled.md`): themes as sections, one line per confirmed
 group or kept item, ordered within a section by age; an appendix maps each line
-to the old items it replaces, and lists what was dropped and why. Re-running
+to the old items it replaces, and lists what was dropped and why. Items marked
+done get their own section at the end, apart from the themes (owner,
+2026-10-05). The Reminders export cannot show done / not-done, so that section
+fills only as the agent proposes and the owner confirms items as done. Re-running
 the export after more review rewrites it from the log, so edits belong in the
 UI, not in the exported file.
 
 ## 9. For the owner to decide
 
-1. **"Sentiment"** — is grouping by theme / meaning what you meant? Or do you
-   also want a second axis, such as the *kind* of item (task, idea, someday,
-   thing to buy, reference) or its tone (urgent, nagging, wishful)?
-2. **Which end of the Reminders list is older** — and does older mean
-   "long-standing, matters" or "probably stale"? It changes what the UI
-   highlights.
-3. **Done items** — the Reminders export cannot show done / not-done. Does that
-   list include completed reminders?
+1. **"Sentiment"** — **answered 2026-10-05:** it means theme / meaning. Theme
+   is the only axis for now; no second label for the *kind* of item (task,
+   idea, someday, thing to buy, reference) or its tone.
+2. **Age** — **answered 2026-10-05:** for now age only means farther back in
+   the list; it marks an item neither as important nor as stale. Read here as
+   farther down the list = older; reverse it if the export runs the other way.
+3. **Done items** — **answered 2026-10-05:** they go in a separate section of
+   the new list (the owner expects them to be mostly junk). Still unknown:
+   whether the export includes completed reminders at all.
 4. **The agent reads the text.** A Claude Code session grouping your items
    means the item text passes through Claude, as it does in any session. The
    pipeline itself would call no hosted service. `docs/SCOPE.md` has been
    reworded to say this; say so if you want the agent kept away from some
    documents.
-5. **The laptop** — CPU, memory, free disk, distro and Python version. An old
-   or 32-bit machine can change which packages install at all.
+5. **The laptop** — **answered 2026-10-05:** phase 1 runs locally on the
+   owner's laptop: Ubuntu 24.04, x86_64, Intel i5-4300U (4 threads), 7.5 GB
+   memory, 595 GB free disk, Python 3.12 in `.venv`.
 6. **Where the new list lives** — a Markdown file in the private repo is the
    phase-1 answer. Back into Reminders or a Google Doc would be a later step.
 
