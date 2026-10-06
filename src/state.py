@@ -64,7 +64,7 @@ def _text(entry: dict, key: str) -> str:
     return value
 
 
-def _order(n) -> tuple:
+def order(n) -> tuple:
     """Sorts item numbers and part ids together: 7 < "7.1" < "7.2" < 8."""
     return tuple(int(x) for x in str(n).split("."))
 
@@ -116,7 +116,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
                 del groups[gid]
 
     def put(g: dict, ns: list) -> None:
-        g["items"] = sorted(g["items"] + ns, key=_order)
+        g["items"] = sorted(g["items"] + ns, key=order)
         g["confirmed"] = False
 
     if e.get("who") not in ("proposal", "agent", "owner"):
@@ -247,7 +247,7 @@ def account(item_ns: list, state: dict) -> dict:
         ("not in the document", set(placed) - expected),
         ("broken without their parts", {n for n, pids in broken.items() if not set(pids) <= set(parts)}),
     ):
-        ns = sorted(ns, key=_order)
+        ns = sorted(ns, key=order)
         if ns:
             raise LogError(f"{len(ns)} items {problem}: {ns[:10]}")
     return {

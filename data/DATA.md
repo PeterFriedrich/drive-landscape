@@ -85,6 +85,10 @@ Each folder keeps the **original file as received** plus what was extracted:
   `items.jsonl` (`python -m src.embed data/raw/private/todo/<id>`). A local
   cache, gitignored in the private repo: vectors differ slightly between
   machines, so rebuild it rather than copy it.
+- `work/part_vectors.npz` — the vectors of the parts the owner split items
+  into (`break`), keyed by the part's text and filled in by `src/distill.py`
+  the first time a command needs them. A local cache like `vectors.npy`, and
+  gitignored the same way.
 - `work/proposal.json` — what `python -m src.distill propose <id>` suggested:
   the settings, the counts, the same-thing groups and the themes, each a list
   of item numbers. Committed in the private repo.
