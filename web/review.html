@@ -26,6 +26,7 @@ h3 { margin:22px 0 6px; font-size:13px; color:var(--soft); font-weight:600; text
 .bar { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; }
 .card.done { border-color:var(--ok); }
+.later > .tx, .card.later > .head b { opacity:.6; }
 .card .head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
 .card .head b { font-size:15px; }
 .row { display:flex; gap:10px; padding:6px 4px; border-top:1px solid var(--line); align-items:flex-start; }
@@ -71,7 +72,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
 let S = null, current = null, justSplit = [];
-const NONE = "", DROPPED = "~dropped";
+const NONE = "", DROPPED = "~dropped", LATER = "~later";
 const $ = (s) => document.querySelector(s);
 
 function el(tag, props = {}, ...kids) {
@@ -123,6 +124,7 @@ function sections() {
   const looseItems = items().filter((it) => alone(it) && it.theme === null).length;
   const looseGroups = Object.values(S.groups).filter((g) => g.theme === null).length;
   rows.push({ id: NONE, name: "In no theme", size: looseItems + looseGroups });
+  rows.push({ id: LATER, name: "Later", size: S.counts.later });
   rows.push({ id: DROPPED, name: "Dropped", size: S.counts.dropped });
   return rows;
 }
@@ -133,7 +135,7 @@ function render() {
   $("#save").textContent = S.unsaved ? "Save" : S.unsaved === false ? "Saved" : "Save (no repository)";
   $("#save").className = S.unsaved ? "due" : "";
   $("#save").disabled = !S.unsaved;
-  $("#counts").textContent = `${c.undecided} undecided · ${c.in_groups} in ${c.groups} groups (${c.groups_confirmed} confirmed) · ${c.kept} kept · ${c.dropped} dropped · ${c.broken} split into ${c.parts} · ${c.themes} themes (${c.themes_confirmed} confirmed)`;
+  $("#counts").textContent = `${c.undecided} undecided · ${c.in_groups} in ${c.groups} groups (${c.groups_confirmed} confirmed) · ${c.kept} kept · ${c.later} later · ${c.dropped} dropped · ${c.broken} split into ${c.parts} · ${c.themes} themes (${c.themes_confirmed} confirmed)`;
   const rows = sections();
   if (current === null || !rows.some((r) => r.id === current)) current = rows[0].id;
   const q = $("#filter").value.trim().toLowerCase();
@@ -160,12 +162,14 @@ function itemRow(it, inGroup) {
     if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }))));
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
+    if (!inGroup) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
     acts.append(btn("Drop", () => { const reason = prompt("Why drop it?"); if (reason) send({ op: "drop", item: it.n, reason }); }));
   }
-  return el("div", { class: "row" },
+  return el("div", { class: "row" + (it.later ? " later" : "") },
     el("span", { class: "n" }, "#" + it.n),
     el("span", { class: "tx" }, it.text,
       it.where === "kept" ? badge(it.confirmed ? "kept ✓" : "kept", "ok") : null,
+      it.later ? badge("later") : null,
       it.where === "dropped" ? badge(it.reason, "warn") : null),
     acts);
 }
@@ -173,13 +177,14 @@ function itemRow(it, inGroup) {
 function groupCard(gid) {
   const g = S.groups[gid];
   const head = el("div", { class: "head" }, el("b", {}, g.draft || g.name), badge(gid),
-    g.confirmed ? badge("confirmed", "ok") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
+    g.confirmed ? badge("confirmed", "ok") : null, g.later ? badge("later") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
   const bar = el("div", { class: "bar" },
     g.confirmed ? null : btn("Confirm group", () => send({ op: "confirm", group: gid }), "main"),
     btn("Edit line", () => { const text = prompt("The line in the new list:", g.draft || g.name); if (text) send({ op: "draft", group: gid, text }); }),
     btn("Rename", () => { const name = prompt("Group name:", g.name); if (name) send({ op: "rename", group: gid, name }); }),
-    btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }))));
-  return el("div", { class: "card" + (g.confirmed ? " done" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
+    btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }))),
+    btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
+  return el("div", { class: "card" + (g.confirmed ? " done" : "") + (g.later ? " later" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
 }
 
 function renderMain() {
@@ -189,13 +194,17 @@ function renderMain() {
   if (waiting.length) {
     out.push(el("h3", {}, "Just split, not placed yet"), el("div", { class: "card" }, ...waiting.map((it) => {
       const row = itemRow(it, false);
-      if (current !== NONE && current !== DROPPED)
+      if (![NONE, DROPPED, LATER].includes(current))
         row.querySelector(".acts").prepend(btn("Put here", () => send({ op: "assign", item: it.n, theme: current }), "main"));
       return row;
     })));
   }
   if (current === DROPPED) {
     out.push(el("h2", {}, "Dropped"), el("div", { class: "card" }, ...items().filter((it) => it.where === "dropped").map((it) => itemRow(it, false))));
+  } else if (current === LATER) {
+    const loose = items().filter((it) => it.later);
+    out.push(el("h2", {}, "Later"), ...Object.keys(S.groups).filter((gid) => S.groups[gid].later).map(groupCard));
+    if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
   } else if (current === NONE) {
     const groups = Object.keys(S.groups).filter((gid) => S.groups[gid].theme === null);
     const loose = items().filter((it) => alone(it) && it.theme === null);

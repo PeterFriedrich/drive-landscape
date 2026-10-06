@@ -222,7 +222,7 @@ session never has to read a whole document into its context.
 | `themes <id> [--limit N] [--offset N]` | the themes as they stand in the log, largest first: name, size, groups, age span, how many items are undecided, confirmed |
 | `show <id> <group, theme or item>` | its items in age order, with their nearest outside neighbours; for one item that has several sentences, the sentence-by-sentence split |
 | `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
-| `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
+| `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `later`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
 | `export <id> [--draft]` | write `distilled.md`: confirmed groups and kept items by theme, what each line replaces, what was dropped; report what is still open. `--draft` adds unconfirmed groups, marked |
 
 Built so far (`python -m src.distill`): `status`, `propose`, `groups`,
@@ -258,7 +258,8 @@ first, then "In no theme" and "Dropped"), and one theme per screen with its
 groups and its single items. Per item: split (the box pre-filled sentence by
 sentence, one new item per line), keep, drop, theme, group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
-and theme: confirm, rename, edit the line, move, fold. Undo. Keys: `j` / `k`
+and theme: confirm, rename, edit the line, move, fold. Per item on its own and
+per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Undo. Keys: `j` / `k`
 between themes, `u` undo, `/` filter. Every decision is written to the log
 file at once; **Save** (`POST /api/save`) commits the log in the repository
 that holds the document and pushes it, and is the only thing that does: the
@@ -270,7 +271,12 @@ to the log.
 
 **The new list** (`distilled.md`): themes as sections, one line per confirmed
 group or kept item, ordered within a section by age; an appendix maps each line
-to the old items it replaces, and lists what was dropped and why. Re-running
+to the old items it replaces, and lists what was dropped and why. A group or
+kept item marked **later** (`later <id> <group or item> on|off`; the owner's
+word for de-prioritized) stays on the list: its line leaves its theme's section
+for one "Later" section after all the themes, with the theme's name after it.
+Marking an undecided item later keeps it; an item inside a group is not marked
+on its own. The mark does not unconfirm anything. Re-running
 the export after more review rewrites it from the log, so edits belong in the
 UI, not in the exported file.
 

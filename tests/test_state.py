@@ -28,7 +28,7 @@ def test_empty_log_leaves_everything_undecided():
     assert state["undecided"] == set(NS)
     assert account(NS, state) == {
         "items": 6, "in_groups": 0, "kept": 0, "dropped": 0, "undecided": 6, "broken": 0, "parts": 0,
-        "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0,
+        "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0, "later": 0,
         "themes": 0, "themes_confirmed": 0, "in_no_theme": 6,
     }
 
@@ -71,7 +71,7 @@ def test_merge_and_split():
     assert set(state["groups"]) == {"g1", "g3"}
     assert state["groups"]["g1"]["items"] == [2, 3]
     assert state["groups"]["g3"] == {
-        "name": "shed", "items": [1, 4], "draft": None, "flag": None, "confirmed": False,
+        "name": "shed", "items": [1, 4], "draft": None, "flag": None, "later": False, "confirmed": False,
     }
 
 
@@ -328,3 +328,36 @@ def test_a_broken_log_line_is_named(tmp_path):
     log.write_text(json.dumps(BASE[0]) + "\n{not json\n")
     with pytest.raises(LogError, match="line 2: not JSON"):
         read_log(log)
+
+
+def test_later_marks_a_group_or_a_kept_item_and_keeps_an_undecided_one():
+    state = replay(NS, BASE + [
+        owner("confirm", group="g1"),
+        owner("later", group="g1", on=True),
+        owner("later", item=6, on=True),
+        owner("later", item=5, on=True),
+        owner("later", item=5, on=False),
+    ])
+    assert state["groups"]["g1"]["later"] is True and state["groups"]["g1"]["confirmed"] is True
+    assert state["kept"] == {5: {"confirmed": False, "later": False}, 6: {"confirmed": False, "later": True}}
+    counts = account(NS, state)
+    assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)
+
+
+def test_a_later_mark_follows_a_split_and_goes_when_the_item_is_no_longer_kept():
+    state = replay(NS, BASE + [agent("later", group="g1", on=True), agent("split", group="g1", items=[1], new="g3", name="shed")])
+    assert state["groups"]["g3"]["later"] is True
+    state = replay(NS, BASE + [owner("later", item=5, on=True), owner("unassign", item=5), owner("keep", item=5)])
+    assert state["kept"][5]["later"] is False
+
+
+@pytest.mark.parametrize("entry, message", [
+    (owner("later", item=1, on=True), "item 1 is in group 'g1'"),
+    (owner("later", item=6, on=False), "item 6 is not kept"),
+    (owner("later", group="g9", on=True), "no group 'g9'"),
+    (owner("later", item=5, on="yes"), "on must be true or false"),
+    (owner("later", item=5, group="g1", on=True), "takes one of"),
+])
+def test_later_refuses_what_it_cannot_mark(entry, message):
+    with pytest.raises(LogError, match=message):
+        replay(NS, BASE + [entry])

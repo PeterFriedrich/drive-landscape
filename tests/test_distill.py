@@ -247,7 +247,7 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     code, out = run(root, capsys, "export", "doc-1")
     assert code == 0
     assert {k: v for k, v in out.items() if k != "wrote"} == {
-        "lines": 2, "sections": 2, "dropped": 1, "undecided": 1, "groups_not_confirmed": 1}
+        "lines": 2, "sections": 2, "later": 0, "dropped": 1, "undecided": 1, "groups_not_confirmed": 1}
     md = (doc / "work" / "distilled.md").read_text()
     assert "Oil the gate hinge" not in md and "- fix the gate latch [1]" in md
     assert "- 6: learn the accordion — not this year" in md
@@ -264,3 +264,16 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     state.append(doc, {"who": "agent", "op": "rename", "group": "g1", "name": "gate"})
     code, out = run(root, capsys, "export", "doc-1", "--draft")
     assert out["lines"] == 3 and "- Oil the gate hinge (not confirmed) [2]" in (doc / "work" / "distilled.md").read_text()
+
+    assert run(root, capsys, "later", "doc-1", "g1", "maybe")[0] == 1
+    run(root, capsys, "later", "doc-1", "g1", "on")
+    run(root, capsys, "later", "doc-1", "4", "on")  # undecided, so it is kept too
+    code, out = run(root, capsys, "export", "doc-1", "--draft")
+    assert (out["lines"], out["later"], out["undecided"]) == (4, 2, 0)
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    last = lines.index("## Later")
+    assert max(i for i, l in enumerate(lines) if l.startswith("## ") and i < last) < last < lines.index("## What each line replaces")
+    gate = [i for i, l in enumerate(lines) if l.startswith("- Oil the gate hinge")]
+    assert len(gate) == 1 and last < gate[0] < lines.index("## What each line replaces")
+    assert lines[gate[0]].startswith(f"- Oil the gate hinge (not confirmed) ({t1}) [")
+    assert lines[lines.index(f"## {t1}") + 2 :][:2] == ["- fix the gate latch [1]", ""]

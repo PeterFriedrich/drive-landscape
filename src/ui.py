@@ -87,6 +87,7 @@ def snapshot(doc: Path) -> dict:
             "split": split if len(split) > 1 else None,
             "reason": st["dropped"].get(n),
             "confirmed": st["kept"].get(n, {}).get("confirmed", False),
+            "later": st["kept"].get(n, {}).get("later", False),
         }
     return {
         "doc": doc.name,

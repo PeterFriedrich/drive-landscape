@@ -68,6 +68,11 @@ def test_an_action_is_one_log_line_signed_owner(site):
     snap = json.loads(call(url + "/api/state")[1])
     assert "6" not in snap["items"] and snap["items"]["6.2"]["theme"] == "t1"
     assert snap["groups"]["g2"]["confirmed"] is True
+    assert call(url + "/api/log", {"op": "later", "item": "6.2", "on": True})[0] == 200
+    assert call(url + "/api/log", {"op": "later", "group": "g2", "on": True})[0] == 200
+    snap = json.loads(call(url + "/api/state")[1])
+    assert (snap["items"]["6.2"]["later"], snap["items"]["6.2"]["where"], snap["items"]["6.2"]["theme"]) == (True, "kept", "t1")
+    assert snap["groups"]["g2"]["later"] is True and snap["groups"]["g2"]["confirmed"] is True and snap["counts"]["later"] == 2
 
 
 def test_a_decision_that_makes_no_sense_is_refused_and_not_written(site):
