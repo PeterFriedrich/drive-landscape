@@ -27,7 +27,7 @@ def test_empty_log_leaves_everything_undecided():
     state = replay(NS, [])
     assert state["undecided"] == set(NS)
     assert account(NS, state) == {
-        "items": 6, "in_groups": 0, "kept": 0, "dropped": 0, "undecided": 6,
+        "items": 6, "in_groups": 0, "kept": 0, "dropped": 0, "undecided": 6, "broken": 0, "parts": 0,
         "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0,
     }
 
@@ -155,6 +155,63 @@ def test_account_catches_an_item_that_is_lost_or_placed_twice():
         account(NS[:5], replay(NS, BASE))
     with pytest.raises(LogError, match=r"item numbers repeat: \[2\]"):
         account([1, 2, 2], replay([1, 2], []))
+
+
+def test_break_replaces_an_item_with_its_parts():
+    state = replay(NS, BASE + [owner("break", item=2, parts=["weed the beds", "order seeds"])])
+    assert state["groups"]["g1"]["items"] == [1, 3]
+    assert state["broken"] == {2: ["2.1", "2.2"]}
+    assert state["parts"] == {"2.1": "weed the beds", "2.2": "order seeds"}
+    assert state["undecided"] == {6, "2.1", "2.2"}
+    counts = account(NS, state)
+    assert (counts["items"], counts["broken"], counts["parts"]) == (6, 1, 2)
+    assert counts["in_groups"] + counts["kept"] + counts["dropped"] + counts["undecided"] == 6 - 1 + 2
+
+
+def test_parts_are_items_like_any_other():
+    state = replay(NS, BASE + [
+        owner("break", item=6, parts=["call the bank", "file the form", "buy stamps"]),
+        agent("move", item="6.2", group="g2"),
+        agent("move", item="6.1", group="g1"),
+        agent("drop", item="6.3", reason="done already"),
+        owner("break", item="6.1", parts=["find the number", "call"]),
+    ])
+    assert state["groups"]["g1"]["items"] == [1, 2, 3]
+    assert state["groups"]["g2"]["items"] == [4, "6.2"]
+    assert state["undecided"] == {"6.1.1", "6.1.2"}
+    assert account(NS, state)["broken"] == 2
+
+
+def test_break_unconfirms_the_group_it_takes_from_and_undo_puts_the_item_back():
+    log = BASE + [owner("confirm", group="g1"), owner("break", item=1, parts=["dig", "plant"])]
+    assert replay(NS, log)["groups"]["g1"]["confirmed"] is False
+    state = replay(NS, log + [owner("undo")])
+    assert state["groups"]["g1"]["items"] == [1, 2, 3]
+    assert state["groups"]["g1"]["confirmed"] is True
+    assert state["broken"] == {} and state["parts"] == {}
+
+
+@pytest.mark.parametrize("entry, message", [
+    (agent("break", item=6, parts=["a", "b"]), "only the owner breaks"),
+    (owner("break", item=6, parts=["only one"]), "at least two"),
+    (owner("break", item=6, parts=["a", " "]), "a part is empty"),
+    (owner("break", item=9, parts=["a", "b"]), "no item 9"),
+])
+def test_a_break_that_makes_no_sense_is_refused(entry, message):
+    with pytest.raises(LogError, match=f"line 4: break: .*{message}"):
+        replay(NS, BASE + [entry])
+
+
+def test_a_broken_item_can_no_longer_be_placed():
+    with pytest.raises(LogError, match="line 5: keep: no item 6"):
+        replay(NS, BASE + [owner("break", item=6, parts=["a", "b"]), agent("keep", item=6)])
+
+
+def test_account_catches_a_lost_part():
+    state = replay(NS, BASE + [owner("break", item=6, parts=["a", "b"])])
+    state["undecided"].discard("6.2")
+    with pytest.raises(LogError, match=r"not accounted for: \['6.2'\]"):
+        account(NS, state)
 
 
 def test_append_writes_one_stamped_line_and_refuses_a_bad_one(tmp_path):
