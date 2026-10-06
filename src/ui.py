@@ -10,6 +10,7 @@ the page then reads the state again. Nothing here holds state of its own.
     GET  /api/state             counts, themes, groups and items as they stand
     GET  /api/neighbours?item=N the item's nearest neighbours (src.distill show)
     POST /api/log               one log entry without "who"; new groups and themes get an id
+    POST /api/save              commit the log in the repository that holds the document, and push it
 
 The responses carry item text, which is private — see data/DATA.md.
 """
@@ -18,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -30,6 +32,41 @@ log = logging.getLogger("ui")
 PAGE = Path(__file__).resolve().parent.parent / "web" / "review.html"
 PORT = 8377
 NEW_ID = {"create": ("group", "g"), "split": ("new", "g"), "theme": ("theme", "t")}
+LOG = "work/log.jsonl"
+
+
+def _git(doc: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(doc), *args], capture_output=True, text=True, timeout=60)
+
+
+def unsaved(doc: Path) -> bool | None:
+    """Whether the log holds decisions its repository's remote does not have. None outside a repository."""
+    changed = _git(doc, "status", "--porcelain", "--", LOG)
+    if changed.returncode:
+        return None
+    ahead = _git(doc, "rev-list", "--count", "@{u}..HEAD", "--", LOG)
+    return bool(changed.stdout.strip()) or ahead.stdout.strip() not in ("", "0")
+
+
+def save(doc: Path) -> dict:
+    """Commit the log and push it. Only the owner's Save button does this; nothing commits on its own."""
+    if _git(doc, "rev-parse", "--git-dir").returncode:
+        raise ValueError(f"{doc} is not in a git repository, so there is nowhere to save to")
+    _, c = state.load(doc)  # a log that does not replay is not committed
+    _git(doc, "add", "--", LOG)
+    committed = _git(doc, "diff", "--cached", "--quiet", "--", LOG).returncode == 1
+    if committed:
+        message = (f"{doc.name}: decisions from the review page ({c['kept']} kept, {c['dropped']} dropped, "
+                   f"{c['broken']} split, {c['groups_confirmed']} groups and {c['themes_confirmed']} themes confirmed)")
+        done = _git(doc, "commit", "-q", "-m", message, "--", LOG)
+        if done.returncode:
+            raise ValueError(f"git commit failed: {done.stderr.strip() or done.stdout.strip()}")
+    try:
+        push = _git(doc, "push", "-q")
+        error = push.stderr.strip() if push.returncode else None
+    except subprocess.TimeoutExpired:
+        error = "git push took more than 60 seconds"
+    return {"committed": committed, "pushed": error is None, "error": error}
 
 
 def snapshot(doc: Path) -> dict:
@@ -53,6 +90,7 @@ def snapshot(doc: Path) -> dict:
         }
     return {
         "doc": doc.name,
+        "unsaved": unsaved(doc),
         "counts": counts,
         "themes": [{"id": tid, **t} for tid, t in st["themes"].items()],
         "groups": {gid: {**g, "theme": theme_of_group.get(gid)} for gid, g in st["groups"].items()},
@@ -111,11 +149,14 @@ def handler(doc: Path) -> type[BaseHTTPRequestHandler]:
             if not self.local():
                 return
             # A cross-site form cannot send JSON without a preflight, which is never answered here.
-            if self.path != "/api/log" or self.headers.get("Content-Type") != "application/json":
+            if self.path not in ("/api/log", "/api/save") or self.headers.get("Content-Type") != "application/json":
                 self.send(404, b'{"error": "not found"}')
                 return
             body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-            self.answer(lambda: {"logged": record(doc, json.loads(body))})
+            if self.path == "/api/save":
+                self.answer(lambda: save(doc))
+            else:
+                self.answer(lambda: {"logged": record(doc, json.loads(body))})
 
         def log_message(self, fmt: str, *args) -> None:
             log.info("%s %s", self.command, self.path.split("?")[0])

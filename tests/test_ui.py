@@ -1,5 +1,6 @@
 """src/ui.py: the review page's server, against a made-up document on a free port."""
 import json
+import subprocess
 import threading
 import urllib.error
 import urllib.request
@@ -93,3 +94,37 @@ def test_neighbours_of_an_item(site):
     assert code == 200 and out["item"] == 3
     assert out["nearest_outside"][0]["where"] == "g1" and out["nearest_outside"][0]["theme"] == "t1"
     assert call(url + "/api/neighbours?item=99")[0] == 400
+
+
+def test_save_commits_the_log_and_pushes_it_and_nothing_else_does(site, tmp_path_factory):
+    doc, url = site
+    assert json.loads(call(url + "/api/state")[1])["unsaved"] is None  # not in a repository yet
+    assert call(url + "/api/save", {})[0] == 400
+
+    remote = tmp_path_factory.mktemp("remote")
+    git = lambda where, *args: subprocess.run(["git", "-C", str(where), *args], check=True, capture_output=True, text=True).stdout.strip()
+    git(remote, "init", "-q", "--bare", "-b", "main")
+    git(doc, "init", "-q", "-b", "main")
+    git(doc, "config", "user.name", "Test")
+    git(doc, "config", "user.email", "test@example.org")
+    git(doc, "add", "items.jsonl", "work/log.jsonl")
+    git(doc, "commit", "-q", "-m", "start")
+    git(doc, "remote", "add", "origin", str(remote))
+    git(doc, "push", "-q", "-u", "origin", "main")
+    assert json.loads(call(url + "/api/state")[1])["unsaved"] is False
+
+    assert call(url + "/api/log", {"op": "keep", "item": 6})[0] == 200
+    (doc / "notes.txt").write_text("not the log")
+    git(doc, "add", "notes.txt")
+    assert json.loads(call(url + "/api/state")[1])["unsaved"] is True
+    assert git(remote, "rev-list", "--count", "main") == "1"  # the decision alone saved nothing
+
+    code, body = call(url + "/api/save", {})
+    assert code == 200 and json.loads(body) == {"committed": True, "pushed": True, "error": None}
+    assert git(remote, "log", "-1", "--format=%s", "main").startswith("doc-1: decisions from the review page (1 kept")
+    assert git(remote, "show", "--name-only", "--format=", "main") == "work/log.jsonl"
+    assert git(remote, "show", "main:work/log.jsonl") == (doc / "work" / "log.jsonl").read_text().strip()
+    assert json.loads(call(url + "/api/state")[1])["unsaved"] is False
+    assert json.loads(call(url + "/api/save", {})[1])["committed"] is False
+
+    assert call(url + "/api/save", {}, headers={"Host": "example.org"})[0] == 403
