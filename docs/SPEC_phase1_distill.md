@@ -190,7 +190,11 @@ operations are in that module's docstring. Three rules it settles: changing a
 confirmed group in any way unconfirms it; undo is itself a line (`undo`), so
 the file is never rewritten; and a line is checked against the whole log
 before it is written, so a decision that makes no sense is refused, not
-recorded. Not built yet: `section` (no reader produces sections until the
+recorded. Added at the owner's request: `break`, owner only,
+which replaces one item that holds several todos with one new item per todo
+(`<n>.1`, `<n>.2`, ...); the parts' text lives in the log and each part is
+then placed like any other item. The UI pre-fills the split sentence by
+sentence and the owner corrects it before saving. Not built yet: `section` (no reader produces sections until the
 Markdown one exists).
 
 Why a log rather than one state file: two writers cannot overwrite each other;

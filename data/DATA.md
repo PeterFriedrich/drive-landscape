@@ -90,7 +90,10 @@ Each folder keeps the **original file as received** plus what was extracted:
   of item numbers. Committed in the private repo.
 - `work/log.jsonl` — the review decisions, one per line, appended and never
   rewritten (`src/state.py`, whose docstring gives the line format). Committed
-  in the private repo: it is the record of what the owner confirmed.
+  in the private repo: it is the record of what the owner confirmed. A
+  `break` line also holds item text: the parts the owner split an item into,
+  which exist nowhere else (ids `<n>.1`, `<n>.2`, ... — strings, where `n` is
+  a number).
 - `work/embed_summary.json` — model, item count, timings and peak memory of
   that run, on the machine that ran it.
 

@@ -17,12 +17,16 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
     keep      item                 stays in the new list on its own
     drop      item, reason
     unassign  item                 back to undecided
+    break     item, parts          owner only; the item becomes one new item per text
+                                   in `parts`, numbered <item>.1, <item>.2, ..., all undecided
     draft     group, text          the group's line in the new list
     flag      group, note          marked for the owner
     confirm   group | item         owner only; an item must be kept
     undo                           ignore the latest line not yet undone
 
-Changing a confirmed group in any way unconfirms it. A line that makes no sense
+A broken item is no longer placed anywhere; its parts are items like any other
+(a part can be broken again) and carry their text in the log, since items.jsonl
+does not hold them. Changing a confirmed group in any way unconfirms it. A line that makes no sense
 stops the replay with its line number; `append` checks a line before writing
 it, so that should only happen to a log edited by hand.
 """
@@ -58,6 +62,11 @@ def _text(entry: dict, key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise LogError(f"{key} is empty")
     return value
+
+
+def _order(n) -> tuple:
+    """Sorts item numbers and part ids together: 7 < "7.1" < "7.2" < 8."""
+    return tuple(int(x) for x in str(n).split("."))
 
 
 def _apply(state: dict, known: set, e: dict) -> None:
@@ -107,7 +116,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
                 del groups[gid]
 
     def put(g: dict, ns: list) -> None:
-        g["items"] = sorted(g["items"] + ns)
+        g["items"] = sorted(g["items"] + ns, key=_order)
         g["confirmed"] = False
 
     if e.get("who") not in ("proposal", "agent", "owner"):
@@ -162,6 +171,21 @@ def _apply(state: dict, known: set, e: dict) -> None:
         n = item()
         take(n)
         undecided.add(n)
+    elif op == "break":
+        if e["who"] != "owner":
+            raise LogError("only the owner breaks an item")
+        n, texts = item(), e.get("parts")
+        if not isinstance(texts, list) or len(texts) < 2:
+            raise LogError("parts needs at least two texts")
+        if not all(isinstance(t, str) and t.strip() for t in texts):
+            raise LogError("a part is empty")
+        take(n)
+        known.discard(n)
+        state["broken"][n] = [f"{n}.{k}" for k in range(1, len(texts) + 1)]
+        for pid, t in zip(state["broken"][n], texts):
+            state["parts"][pid] = t
+            known.add(pid)
+            undecided.add(pid)
     elif op == "draft":
         g = group()
         g["draft"], g["confirmed"] = _text(e, "text"), False
@@ -195,7 +219,7 @@ def replay(item_ns: list, entries: list[dict]) -> dict:
         else:
             live.append((i, e))
     known = set(item_ns)
-    state = {"groups": {}, "kept": {}, "dropped": {}, "undecided": set(item_ns)}
+    state = {"groups": {}, "kept": {}, "dropped": {}, "undecided": set(item_ns), "broken": {}, "parts": {}}
     for i, e in live:
         try:
             _apply(state, known, e)
@@ -205,18 +229,25 @@ def replay(item_ns: list, entries: list[dict]) -> dict:
 
 
 def account(item_ns: list, state: dict) -> dict:
-    """Counts, after checking every item is in exactly one place: a group, kept, dropped or undecided."""
+    """Counts, after checking every item is in exactly one place: a group, kept, dropped or undecided.
+
+    A broken item is in none of them; each of its parts must be in one.
+    """
     repeats = sorted(n for n, c in Counter(item_ns).items() if c > 1)
     if repeats:
         raise LogError(f"item numbers repeat: {repeats[:10]}")
     groups = state["groups"]
     in_groups = [n for g in groups.values() for n in g["items"]]
     placed = Counter(in_groups + list(state["kept"]) + list(state["dropped"]) + list(state["undecided"]))
+    broken, parts = state["broken"], state["parts"]
+    expected = (set(item_ns) | set(parts)) - set(broken)
     for problem, ns in (
-        ("not accounted for", sorted(set(item_ns) - set(placed))),
-        ("in more than one place", sorted(n for n, c in placed.items() if c > 1)),
-        ("not in the document", sorted(set(placed) - set(item_ns))),
+        ("not accounted for", expected - set(placed)),
+        ("in more than one place", {n for n, c in placed.items() if c > 1}),
+        ("not in the document", set(placed) - expected),
+        ("broken without their parts", {n for n, pids in broken.items() if not set(pids) <= set(parts)}),
     ):
+        ns = sorted(ns, key=_order)
         if ns:
             raise LogError(f"{len(ns)} items {problem}: {ns[:10]}")
     return {
@@ -225,6 +256,8 @@ def account(item_ns: list, state: dict) -> dict:
         "kept": len(state["kept"]),
         "dropped": len(state["dropped"]),
         "undecided": len(state["undecided"]),
+        "broken": len(broken),
+        "parts": len(parts),
         "groups": len(groups),
         "groups_confirmed": sum(g["confirmed"] for g in groups.values()),
         "groups_flagged": sum(g["flag"] is not None for g in groups.values()),

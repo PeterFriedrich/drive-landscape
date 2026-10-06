@@ -40,6 +40,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - **2026-10-05** — Code in this repo (to go public), all Drive-derived data in the private repo `drive-landscape-data` cloned at the gitignored `data/raw/private/`; nothing read from Drive goes in a tracked file. … Rejected: one private repo holding both (owner wants the project public).
 - **2026-10-05** — Embeddings are `BAAI/bge-small-en-v1.5` run locally through `fastembed` (no torch), the same setup as `edmonton-open-data-landscape`; TF-IDF runs beside it. … Rejected: `model2vec` static embeddings (the owner sees no need to go to a minimum-size model).
 - **2026-10-05** — "Grouped by sentiment" means grouped by theme / meaning, and theme is the only axis for now. … Rejected for now: a second label per item for its kind (task, idea, someday, thing to buy, reference) or its tone (urgent, nagging, wishful) — kind can be added later as a tag proposed during review.
+- **2026-10-05** — An item that holds several todos is split by the owner, by hand, into one item per todo (`break`, owner only); the UI pre-fills the split sentence by sentence and nothing is saved until the owner … Rejected: splitting every item into sentences automatically before grouping (the owner wants to make each split), and a blank box (756 of the first list's 1,355 items have more than one sentence).
 
 ## Open work
 
