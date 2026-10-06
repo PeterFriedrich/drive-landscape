@@ -85,6 +85,9 @@ Each folder keeps the **original file as received** plus what was extracted:
   `items.jsonl` (`python -m src.embed data/raw/private/todo/<id>`). A local
   cache, gitignored in the private repo: vectors differ slightly between
   machines, so rebuild it rather than copy it.
+- `work/log.jsonl` — the review decisions, one per line, appended and never
+  rewritten (`src/state.py`, whose docstring gives the line format). Committed
+  in the private repo: it is the record of what the owner confirmed.
 - `work/embed_summary.json` — model, item count, timings and peak memory of
   that run, on the machine that ran it.
 

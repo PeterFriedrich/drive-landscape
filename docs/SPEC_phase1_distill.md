@@ -169,6 +169,14 @@ a group, move an item, keep or drop an item with a reason, set a section in or
 out, set a group's distilled wording, mark a group for the owner, **confirm**).
 The current state is the log replayed from the top.
 
+Built (`src/state.py`, build step 2): the line format and the list of
+operations are in that module's docstring. Three rules it settles: changing a
+confirmed group in any way unconfirms it; undo is itself a line (`undo`), so
+the file is never rewritten; and a line is checked against the whole log
+before it is written, so a decision that makes no sense is refused, not
+recorded. Not built yet: `section` (no reader produces sections until the
+Markdown one exists).
+
 Why a log rather than one state file: two writers cannot overwrite each other;
 undo is "ignore the last line"; the git diff reads as a history; and it records
 which groups the owner actually confirmed, as opposed to ones only the agent
