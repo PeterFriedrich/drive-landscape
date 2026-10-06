@@ -144,6 +144,22 @@ forcing them into groups would make every group worse. An item's heading path
 is added to its text before comparing, so "call them" under two different
 headings is not a match.
 
+Built (`src/grouping.py`, build step 3). The two signals become one distance,
+(1 − meaning) × (1 − words), where meaning is the embedding cosine measured
+from the document's median pair and words is the TF-IDF cosine; it is small
+when either is strong or both are moderate. One average-linkage tree (`scipy`)
+is cut at two heights, 0.25 for same thing and 0.70 for same theme, so a
+same-thing group always sits inside one theme. This replaces the two separate
+`scikit-learn` clusterings in §3, which would not nest. Not built: adding the
+heading path to the text (the Reminders list has no headings).
+
+**On the real list, 2026-10-05:** 64 same-thing groups holding 143 of 1,355
+items (54 of them pairs), and 245 themes holding 1,220 items (largest 42; 89
+are pairs), with 135 items in no theme. The list has few rewordings of one
+task, so most of the distilling will happen at the theme level, and themes are
+not review state yet (§6) — that is the gap to close in step 4. Nobody has
+read these groups yet; the cuts were set from the counts alone.
+
 The cuts start as guesses. **The review itself is the labelling:** every
 confirm, merge and split is recorded (§6), so after the first document there is
 a set of owner-approved groups to score the signals against and tune the cuts —
@@ -192,10 +208,16 @@ session never has to read a whole document into its context.
 | `status <id>` | counts: items, groups, confirmed, undecided, marked for the owner |
 | `ingest <file>` / `propose <id>` | build the blocks / build the proposal |
 | `sections <id>` | each section with its first guess, a few sample lines, in / out |
-| `groups <id> [--unreviewed] [--limit N]` | group summaries: size, age span, sample items |
-| `show <id> <group>` | one group's items in age order, with their nearest outside neighbours |
+| `groups <id> [--unreviewed] [--limit N] [--offset N]` | group summaries: size, age span, sample items |
+| `themes <id> [--limit N] [--offset N]` | the proposed themes, largest first: size, age span, how many items are undecided |
+| `show <id> <group or theme>` | its items in age order, with their nearest outside neighbours |
 | `rename`, `merge`, `split`, `move`, `keep`, `drop`, `section`, `draft`, `flag` | the edits, each one log line |
 | `export <id>` | write `distilled.md`; report what is still undecided |
+
+Built so far (`python -m src.distill`, build step 3): `status`, `propose`,
+`groups`, `themes`, `show`. `propose` writes `proposal.json` and starts the log
+with one `create` line per same-thing group, signed `proposal`; it refuses to
+run over an existing proposal or log.
 
 A project skill gives the routine: check status → settle sections → go through
 unreviewed groups a batch at a time → draft wording → flag anything doubtful

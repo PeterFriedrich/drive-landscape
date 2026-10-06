@@ -32,6 +32,8 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - pdfplumber==0.11.10
 - fastembed==0.8.1
 - numpy==2.5.3
+- scikit-learn==1.9.1
+- scipy==1.18.1
 
 ## Locked decisions
 
