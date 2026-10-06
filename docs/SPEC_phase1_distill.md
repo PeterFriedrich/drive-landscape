@@ -251,7 +251,7 @@ For final checks, not for doing the sorting by hand.
 - Reads and writes only through the same functions as §7, on `127.0.0.1`.
 
 Built (`python -m src.ui <id>`, then http://127.0.0.1:8377/): `src/ui.py`
-serves `web/review.html` and three JSON routes; every action is one log line
+serves `web/review.html` and four JSON routes; every action is one log line
 signed `owner`, and the page reads the state again afterwards. The first
 version is arranged by theme, not as a queue: themes down the side (largest
 first, then "In no theme" and "Dropped"), and one theme per screen with its
@@ -259,7 +259,10 @@ groups and its single items. Per item: split (the box pre-filled sentence by
 sentence, one new item per line), keep, drop, theme, group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Undo. Keys: `j` / `k`
-between themes, `u` undo, `/` filter. Not built: the flagged-first queue, the
+between themes, `u` undo, `/` filter. Every decision is written to the log
+file at once; **Save** (`POST /api/save`) commits the log in the repository
+that holds the document and pushes it, and is the only thing that does: the
+button is filled while the log holds decisions the remote lacks. Not built: the flagged-first queue, the
 preview of the new list, why items were put together, the sections view.
 Requests whose `Host` is not `127.0.0.1` / `localhost` are refused, and the
 write route takes JSON only, so another site open in the browser cannot write

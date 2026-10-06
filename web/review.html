@@ -40,6 +40,8 @@ button, input, textarea { font:inherit; color:inherit; background:var(--panel); 
 button { cursor:pointer; font-size:13px; }
 button:hover { background:var(--hover); }
 button.main { border-color:var(--accent); color:var(--accent); }
+#save { font-size:15px; font-weight:600; padding:6px 18px; }
+#save.due { background:var(--accent); border-color:var(--accent); color:#fff; }
 dialog { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; width:min(680px, 92vw); padding:16px; }
 dialog::backdrop { background:rgba(0,0,0,.4); }
 dialog textarea, dialog input { width:100%; }
@@ -56,6 +58,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
   <b id="doc"></b>
   <span id="counts"></span>
   <button id="undo" title="Take back the latest decision (u)">Undo</button>
+  <button id="save" title="Commit your decisions to the private repository and push them"></button>
 </header>
 <nav>
   <input id="filter" placeholder="Filter themes ( / )">
@@ -127,6 +130,9 @@ function sections() {
 function render() {
   const c = S.counts;
   $("#doc").textContent = S.doc;
+  $("#save").textContent = S.unsaved ? "Save" : S.unsaved === false ? "Saved" : "Save (no repository)";
+  $("#save").className = S.unsaved ? "due" : "";
+  $("#save").disabled = !S.unsaved;
   $("#counts").textContent = `${c.undecided} undecided · ${c.in_groups} in ${c.groups} groups (${c.groups_confirmed} confirmed) · ${c.kept} kept · ${c.dropped} dropped · ${c.broken} split into ${c.parts} · ${c.themes} themes (${c.themes_confirmed} confirmed)`;
   const rows = sections();
   if (current === null || !rows.some((r) => r.id === current)) current = rows[0].id;
@@ -285,6 +291,16 @@ async function similar(it) {
 
 const undo = () => send({ op: "undo" }).then((ok) => ok && toast("Took back the latest decision."));
 $("#undo").addEventListener("click", undo);
+$("#save").addEventListener("click", async () => {
+  $("#save").disabled = true;
+  $("#save").textContent = "Saving…";
+  const r = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const j = await r.json();
+  await load();
+  if (!r.ok) toast(j.error);
+  else if (!j.pushed) toast("Committed on this laptop, but not pushed: " + j.error);
+  else toast("Saved to the private repository.");
+});
 $("#filter").addEventListener("input", render);
 document.addEventListener("keydown", (e) => {
   if ($("#dlg").open || e.ctrlKey || e.metaKey || e.altKey) return;
