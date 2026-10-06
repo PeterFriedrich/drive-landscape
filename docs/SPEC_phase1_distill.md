@@ -214,12 +214,13 @@ session never has to read a whole document into its context.
 | `sections <id>` | each section with its first guess, a few sample lines, in / out |
 | `groups <id> [--unreviewed] [--limit N] [--offset N]` | group summaries: size, age span, sample items |
 | `themes <id> [--limit N] [--offset N]` | the proposed themes, largest first: size, age span, how many items are undecided |
-| `show <id> <group or theme>` | its items in age order, with their nearest outside neighbours |
+| `show <id> <group, theme or item>` | its items in age order, with their nearest outside neighbours; for one item that has several sentences, the sentence-by-sentence split |
+| `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
 | `rename`, `merge`, `split`, `move`, `keep`, `drop`, `section`, `draft`, `flag` | the edits, each one log line |
 | `export <id>` | write `distilled.md`; report what is still undecided |
 
-Built so far (`python -m src.distill`, build step 3): `status`, `propose`,
-`groups`, `themes`, `show`. `propose` writes `proposal.json` and starts the log
+Built so far (`python -m src.distill`): `status`, `propose`, `groups`,
+`themes`, `show`, `break`. `propose` writes `proposal.json` and starts the log
 with one `create` line per same-thing group, signed `proposal`; it refuses to
 run over an existing proposal or log.
 

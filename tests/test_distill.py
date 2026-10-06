@@ -105,7 +105,7 @@ def test_show_gives_the_items_and_their_nearest_outside_neighbours(root, capsys)
     assert [(it["n"], it["where"]) for it in out["items"]] == [(3, "undecided"), (2, "g1"), (1, "g1")]
 
     code, out = run(root, capsys, "show", "doc-1", "g99")
-    assert code == 1 and "no group or theme 'g99'" in out["error"]
+    assert code == 1 and "no group, theme or item 'g99'" in out["error"]
 
 
 def test_long_text_is_cut(root, capsys):
@@ -116,3 +116,71 @@ def test_long_text_is_cut(root, capsys):
     run(root, capsys, "propose", "doc-1")
     _, out = run(root, capsys, "show", "doc-1", "g1")
     assert max(len(it["text"]) for it in out["items"]) == distill.TEXT_CHARS
+
+
+def test_show_on_an_item_suggests_a_split_only_when_it_has_several_sentences(root, capsys):
+    doc = root / "doc-1"
+    rows = [json.loads(line) for line in (doc / "items.jsonl").read_text().splitlines()]
+    rows[5]["text"] = "Learn the accordion. Oil the gate hinge? Renew the library card"
+    (doc / "items.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    _, out = run(root, capsys, "show", "doc-1", "6")
+    assert out["item"] == 6
+    assert out["split"] == ["Learn the accordion.", "Oil the gate hinge?", "Renew the library card"]
+    assert [it["n"] for it in out["items"]] == [6]
+    assert 6 not in [it["n"] for it in out["nearest_outside"]]
+    assert "split" not in run(root, capsys, "show", "doc-1", "1")[1]
+
+
+@pytest.fixture
+def embedded(root, monkeypatch):
+    """Parts embed with a made-up function: the gate direction, or the library one."""
+    calls = []
+
+    def fake(model):
+        assert model == "made-up-model"
+
+        def embed(texts):
+            calls.append(list(texts))
+            return np.array([[1, 0, 0, 0] if "gate" in t else [0, 0, 1, 0] for t in texts], dtype=float)
+        return embed
+
+    (root / "doc-1" / "work" / "embed_summary.json").write_text(json.dumps({"model": "made-up-model"}))
+    monkeypatch.setattr(distill, "fastembed_fn", fake)
+    return calls
+
+
+def test_break_makes_parts_that_show_among_their_neighbours(root, capsys, embedded):
+    run(root, capsys, "propose", "doc-1")
+    code, out = run(root, capsys, "break", "doc-1", "6", "--who", "owner", "oil the gate hinge again", "renew the library card too")
+    assert code == 0
+    assert out == {"item": 6, "parts": [
+        {"n": "6.1", "text": "oil the gate hinge again"}, {"n": "6.2", "text": "renew the library card too"}]}
+    _, out = run(root, capsys, "status", "doc-1")
+    assert (out["broken"], out["parts"], out["undecided"]) == (1, 2, 5)
+
+    _, out = run(root, capsys, "show", "doc-1", "6.1")
+    assert out["item"] == "6.1" and out["items"][0]["where"] == "undecided"
+    assert (out["nearest_outside"][0]["n"], out["nearest_outside"][0]["where"]) in ((1, "g1"), (2, "g1"))
+    _, out = run(root, capsys, "show", "doc-1", "g1")
+    assert out["nearest_outside"][0]["n"] == "6.1"
+    assert 6 not in [it["n"] for it in out["nearest_outside"]]
+    _, out = run(root, capsys, "show", "doc-1", "6")
+    assert out["parts"] == ["6.1", "6.2"] and out["items"][0]["where"] == "broken"
+    assert embedded == [["oil the gate hinge again", "renew the library card too"]]  # embedded once, then cached
+
+    state.append(root / "doc-1", {"who": "agent", "op": "move", "item": "6.1", "group": "g1"})
+    g = run(root, capsys, "groups", "doc-1")[1]["groups"][0]
+    assert (g["size"], g["oldest"], g["span"]) == (3, "6.1", [1, "6.1"])
+    assert g["sample"][0] == "oil the gate hinge again"
+
+
+def test_break_is_refused_from_anyone_but_the_owner(root, capsys):
+    code, out = run(root, capsys, "break", "doc-1", "6", "--who", "agent", "a", "b")
+    assert code == 1 and "only the owner breaks" in out["error"]
+    assert not (root / "doc-1" / "work" / "log.jsonl").read_text()
+
+
+def test_parts_cannot_be_embedded_without_knowing_the_model(root, capsys):
+    run(root, capsys, "break", "doc-1", "6", "--who", "owner", "a", "b")
+    code, out = run(root, capsys, "show", "doc-1", "1")
+    assert code == 1 and "model the items were embedded with is unknown" in out["error"]
