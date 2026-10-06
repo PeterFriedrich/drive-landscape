@@ -6,6 +6,18 @@
     python -m src.distill themes  todo-001 [--limit N] [--offset N]
     python -m src.distill show    todo-001 g12        (or a theme: t3, an item: 412, a part: 412.1)
     python -m src.distill break   todo-001 412 --who owner "first todo" "second todo"
+    python -m src.distill export  todo-001 [--draft]
+
+and the edits, each one line appended to the log, signed --who (default agent):
+
+    create NAME ITEM...        rename GROUP|THEME NAME     merge INTO GROUP...
+    split GROUP NAME ITEM...   move ITEM GROUP             keep ITEM
+    drop ITEM REASON           unassign ITEM               draft GROUP TEXT
+    flag GROUP NOTE            theme NAME MEMBER...        assign MEMBER THEME|none
+    fold INTO THEME...         undo
+
+A MEMBER is a group id or an item. New groups and themes get the next free id.
+There is no confirm here: only the owner confirms, in the UI.
 
 `propose` needs the vectors from `python -m src.embed <doc>`. It writes
 <doc>/work/proposal.json (both levels, and the settings used) and starts the log
@@ -256,11 +268,98 @@ def break_item(doc: Path, args) -> dict:
     return {"item": n, "parts": [{"n": pid, "text": _clip(st["parts"][pid])} for pid in st["broken"][n]]}
 
 
+def _item(arg: str):
+    n = _item_id(arg)
+    if n is None:
+        raise DistillError(f"not an item: {arg!r}")
+    return n
+
+
+def _member(arg: str) -> dict:
+    n = _item_id(arg)
+    return {"group": arg} if n is None else {"item": n}
+
+
+def _next_id(doc: Path, prefix: str) -> str:
+    # From the log, not the state: an id that was merged away or undone is not reused.
+    used = [e.get(k) for e in state.read_log(doc / "work" / "log.jsonl") for k in ("group", "new", "theme")]
+    return f"{prefix}{max((int(u[len(prefix):]) for u in used if isinstance(u, str) and re.fullmatch(prefix + r'\d+', u)), default=0) + 1}"
+
+
+def _new_theme(doc: Path, a) -> dict:
+    members = [_member(m) for m in a.members]
+    return {"theme": _next_id(doc, "t"), "name": a.name,
+            "groups": [m["group"] for m in members if "group" in m], "items": [m["item"] for m in members if "item" in m]}
+
+
+# Each edit: its arguments (a trailing + takes one or more), and the log fields they become.
+EDITS = {
+    "create": ("name items+", lambda doc, a: {"group": _next_id(doc, "g"), "name": a.name, "items": [_item(x) for x in a.items]}),
+    "rename": ("target name", lambda doc, a: {"theme" if a.target in state.load(doc)[0]["themes"] else "group": a.target, "name": a.name}),
+    "merge": ("into groups+", lambda doc, a: {"into": a.into, "groups": a.groups}),
+    "split": ("group name items+", lambda doc, a: {"group": a.group, "items": [_item(x) for x in a.items], "new": _next_id(doc, "g"), "name": a.name}),
+    "move": ("item group", lambda doc, a: {"item": _item(a.item), "group": a.group}),
+    "keep": ("item", lambda doc, a: {"item": _item(a.item)}),
+    "drop": ("item reason", lambda doc, a: {"item": _item(a.item), "reason": a.reason}),
+    "unassign": ("item", lambda doc, a: {"item": _item(a.item)}),
+    "draft": ("group text", lambda doc, a: {"group": a.group, "text": a.text}),
+    "flag": ("group note", lambda doc, a: {"group": a.group, "note": a.note}),
+    "theme": ("name members+", _new_theme),
+    "assign": ("member theme", lambda doc, a: {**_member(a.member), "theme": None if a.theme == "none" else a.theme}),
+    "fold": ("into themes+", lambda doc, a: {"into": a.into, "themes": a.themes}),
+    "undo": ("", lambda doc, a: {}),
+}
+
+
+def edit(doc: Path, args) -> dict:
+    return {"logged": state.append(doc, {"who": args.who, "op": args.command, **EDITS[args.command][1](doc, args)})}
+
+
+def export(doc: Path, args) -> dict:
+    """Write <doc>/work/distilled.md from the log: themes as sections, then what each line replaces."""
+    st, counts = state.load(doc)
+    text = {**{it["n"]: it["text"] for it in read_items(doc / "items.jsonl")}, **st["parts"]}
+    section_of = {("g", gid): tid for tid, t in st["themes"].items() for gid in t["groups"]}
+    section_of.update({("i", n): tid for tid, t in st["themes"].items() for n in t["items"]})
+    sections: dict = {}
+    for gid, g in st["groups"].items():
+        if g["confirmed"] or args.draft:
+            line = (g["draft"] or g["name"]) + ("" if g["confirmed"] else " (not confirmed)")
+            sections.setdefault(section_of.get(("g", gid)), []).append((oldest_first(g["items"]), line))
+    for n in st["kept"]:
+        sections.setdefault(section_of.get(("i", n)), []).append(([n], text[n]))
+    # Largest section first, items in no theme last; within a section, oldest first.
+    order = sorted(sections, key=lambda tid: (tid is None, -len(sections[tid]), str(tid)))
+    out, appendix, k = [f"# {doc.name}, distilled", ""], [], 0
+    for tid in order:
+        out += [f"## {st['themes'][tid]['name'] if tid is not None else 'In no theme'}", ""]
+        for ns, line in sorted(sections[tid], key=lambda row: state.order(row[0][0]), reverse=True):
+            k += 1
+            out.append(f"- {line} [{k}]")
+            appendix += [f"**[{k}]** {line}", ""] + [f"- {n}: {text[n]}" for n in ns] + [""]
+        out.append("")
+    out += ["## What each line replaces", ""] + appendix
+    out += ["## Dropped", ""] + [f"- {n}: {text[n]} — {st['dropped'][n]}" for n in oldest_first(st["dropped"])] + [""]
+    left = {"undecided": counts["undecided"], "groups_not_confirmed": counts["groups"] - counts["groups_confirmed"]}
+    out += ["## Still open", "", f"- {left['undecided']} items undecided",
+            f"- {left['groups_not_confirmed']} groups not confirmed" + ("" if args.draft else " (left out; --draft includes them)"), ""]
+    path = doc / "work" / "distilled.md"
+    path.write_text("\n".join(out), encoding="utf-8")
+    return {"wrote": str(path), "lines": k, "sections": len(order), "dropped": counts["dropped"], **left}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", type=Path, default=ROOT, help="folder holding one folder per document")
     sub = ap.add_subparsers(dest="command", required=True)
-    for fn in (status, propose, groups, themes, show, break_item):
+    for name, (spec, _) in EDITS.items():
+        p = sub.add_parser(name)
+        p.set_defaults(fn=edit)
+        p.add_argument("id", help="document id, e.g. todo-001")
+        for arg in spec.split():
+            p.add_argument(arg.rstrip("+"), **({"nargs": "+"} if arg.endswith("+") else {}))
+        p.add_argument("--who", default="agent", choices=("agent", "owner"))
+    for fn in (status, propose, groups, themes, show, break_item, export):
         p = sub.add_parser(fn.__name__.removesuffix("_item"))
         p.set_defaults(fn=fn)
         p.add_argument("id", help="document id, e.g. todo-001")
@@ -274,6 +373,8 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("item", help="an item (412) or a part (412.1)")
             p.add_argument("parts", nargs="+", help="the text of each new item")
             p.add_argument("--who", required=True, help="owner; the log refuses a break from anyone else")
+        if fn is export:
+            p.add_argument("--draft", action="store_true", help="include groups the owner has not confirmed, marked as such")
         if fn in (groups, themes):
             p.add_argument("--limit", type=int, default=20)
             p.add_argument("--offset", type=int, default=0)
