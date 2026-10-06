@@ -292,6 +292,12 @@ def _new_theme(doc: Path, a) -> dict:
             "groups": [m["group"] for m in members if "group" in m], "items": [m["item"] for m in members if "item" in m]}
 
 
+def _later(doc: Path, a) -> dict:
+    if a.on not in ("on", "off"):
+        raise DistillError(f"later takes on or off, not {a.on!r}")
+    return {**_member(a.member), "on": a.on == "on"}
+
+
 # Each edit: its arguments (a trailing + takes one or more), and the log fields they become.
 EDITS = {
     "create": ("name items+", lambda doc, a: {"group": _next_id(doc, "g"), "name": a.name, "items": [_item(x) for x in a.items]}),
@@ -304,6 +310,7 @@ EDITS = {
     "unassign": ("item", lambda doc, a: {"item": _item(a.item)}),
     "draft": ("group text", lambda doc, a: {"group": a.group, "text": a.text}),
     "flag": ("group note", lambda doc, a: {"group": a.group, "note": a.note}),
+    "later": ("member on", _later),
     "theme": ("name members+", _new_theme),
     "assign": ("member theme", lambda doc, a: {**_member(a.member), "theme": None if a.theme == "none" else a.theme}),
     "fold": ("into themes+", lambda doc, a: {"into": a.into, "themes": a.themes}),
@@ -322,18 +329,28 @@ def export(doc: Path, args) -> dict:
     section_of = {("g", gid): tid for tid, t in st["themes"].items() for gid in t["groups"]}
     section_of.update({("i", n): tid for tid, t in st["themes"].items() for n in t["items"]})
     sections: dict = {}
+    later: list = []
+
+    def place(key: tuple, marked: bool, ns: list, line: str) -> None:
+        tid = section_of.get(key)
+        if marked:
+            later.append((ns, line + (f" ({st['themes'][tid]['name']})" if tid is not None else "")))
+        else:
+            sections.setdefault(tid, []).append((ns, line))
+
     for gid, g in st["groups"].items():
         if g["confirmed"] or args.draft:
             line = (g["draft"] or g["name"]) + ("" if g["confirmed"] else " (not confirmed)")
-            sections.setdefault(section_of.get(("g", gid)), []).append((oldest_first(g["items"]), line))
-    for n in st["kept"]:
-        sections.setdefault(section_of.get(("i", n)), []).append(([n], text[n]))
+            place(("g", gid), g["later"], oldest_first(g["items"]), line)
+    for n, k in st["kept"].items():
+        place(("i", n), k["later"], [n], text[n])
     # Largest section first, items in no theme last; within a section, oldest first.
     order = sorted(sections, key=lambda tid: (tid is None, -len(sections[tid]), str(tid)))
     out, appendix, k = [f"# {doc.name}, distilled", ""], [], 0
-    for tid in order:
-        out += [f"## {st['themes'][tid]['name'] if tid is not None else 'In no theme'}", ""]
-        for ns, line in sorted(sections[tid], key=lambda row: state.order(row[0][0]), reverse=True):
+    titled = [(st["themes"][tid]["name"] if tid is not None else "In no theme", sections[tid]) for tid in order]
+    for title, rows in titled + ([("Later", later)] if later else []):
+        out += [f"## {title}", ""]
+        for ns, line in sorted(rows, key=lambda row: state.order(row[0][0]), reverse=True):
             k += 1
             out.append(f"- {line} [{k}]")
             appendix += [f"**[{k}]** {line}", ""] + [f"- {n}: {text[n]}" for n in ns] + [""]
@@ -345,7 +362,7 @@ def export(doc: Path, args) -> dict:
             f"- {left['groups_not_confirmed']} groups not confirmed" + ("" if args.draft else " (left out; --draft includes them)"), ""]
     path = doc / "work" / "distilled.md"
     path.write_text("\n".join(out), encoding="utf-8")
-    return {"wrote": str(path), "lines": k, "sections": len(order), "dropped": counts["dropped"], **left}
+    return {"wrote": str(path), "lines": k, "sections": len(order), "later": len(later), "dropped": counts["dropped"], **left}
 
 
 def main(argv: list[str] | None = None) -> int:
