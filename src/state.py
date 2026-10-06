@@ -6,7 +6,8 @@ Prints the counts for <doc> as JSON. <doc>/work/log.jsonl holds one decision per
 line and is only ever appended to; the state is that log replayed from the top
 over the items in <doc>/items.jsonl. Both are private — see data/DATA.md.
 
-A log line is {"who": "agent" | "owner", "when": ISO time, "op": ..., fields}:
+A log line is {"who": "proposal" | "agent" | "owner", "when": ISO time, "op": ...,
+fields}; "proposal" is the grouping algorithm (src/distill.py propose):
 
     create    group, name, items   a new group of items that are in no group yet
     rename    group, name
@@ -109,8 +110,8 @@ def _apply(state: dict, known: set, e: dict) -> None:
         g["items"] = sorted(g["items"] + ns)
         g["confirmed"] = False
 
-    if e.get("who") not in ("agent", "owner"):
-        raise LogError("who must be agent or owner")
+    if e.get("who") not in ("proposal", "agent", "owner"):
+        raise LogError("who must be proposal, agent or owner")
     op = e.get("op")
     if op == "create":
         ns = items()

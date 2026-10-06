@@ -122,7 +122,7 @@ def test_undo_ignores_the_line_before_it():
 
 @pytest.mark.parametrize("entry, message", [
     (agent("shuffle"), "unknown op 'shuffle'"),
-    ({"who": "robot", "op": "keep", "item": 6}, "who must be agent or owner"),
+    ({"who": "robot", "op": "keep", "item": 6}, "who must be proposal, agent or owner"),
     (agent("keep", item=99), "no item 99"),
     (agent("move", item=6, group="g9"), "no group 'g9'"),
     (agent("create", group="g1", name="again", items=[6]), "group 'g1' already exists"),

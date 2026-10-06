@@ -10,3 +10,6 @@ pdfplumber==0.11.10
 # Embeddings (src/embed.py): ONNX Runtime, no torch. Not in requirements-ci.txt: tests pass a made-up embed function.
 fastembed==0.8.1
 numpy==2.5.3
+# TF-IDF and the clustering tree (src/grouping.py).
+scikit-learn==1.9.1
+scipy==1.18.1
