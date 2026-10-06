@@ -81,6 +81,12 @@ Each folder keeps the **original file as received** plus what was extracted:
   the matching step reads.
 - `list.md` — the same list as a Markdown checklist, for reading and diffing.
 - `extract_summary.json` — the counts from the run.
+- `work/vectors.npy` — one unit-length embedding per item, row i = line i of
+  `items.jsonl` (`python -m src.embed data/raw/private/todo/<id>`). A local
+  cache, gitignored in the private repo: vectors differ slightly between
+  machines, so rebuild it rather than copy it.
+- `work/embed_summary.json` — model, item count, timings and peak memory of
+  that run, on the machine that ran it.
 
 ### Apple Reminders PDF (`src/reminders_pdf.py`)
 

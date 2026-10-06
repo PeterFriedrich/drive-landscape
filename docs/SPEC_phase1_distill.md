@@ -39,8 +39,7 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
   repo. The agent's commands and the owner's UI are two front ends over the
   same functions and the same files.
 - **Every item is accounted for.** At any moment each source item is exactly
-  one of: in a group, kept on its own, marked done, dropped with a reason, or
-  undecided. The
+  one of: in a group, kept on its own, dropped with a reason, or undecided. The
   export states how many are still undecided.
 - **Nothing private in this repo** (`data/DATA.md`).
 
@@ -60,19 +59,26 @@ Drive clean-up, writing back to Google Docs or Reminders, more than one user.
 
 New dependencies: `numpy`, `scikit-learn`, `fastembed` (which brings
 `onnxruntime`). *Target:* under 1 GB of memory, and a 1,500-item document
-grouped in a few minutes at most on the laptop. **Not measured on the laptop yet.** On the server
+grouped in a few minutes at most on the laptop. **Measured on the laptop,
+2026-10-05** (`src/embed.py`, the real list: 1,355 items, median 63
+characters): 25 seconds, 54 items a second, 310 MB peak memory; the install
+added 178 MB to `.venv` and the model 65 MB to the cache. With fastembed's
+default batch of 256 in list order the same run took 104–123 seconds and
+1.3 GB, because a batch is padded to its longest text; sorting by length and
+batching 32 gives the same vectors (cosine 1.0 against the default run). The
+laptop was busy during the runs, so read the times as rough. On the server
 (4 ARM cores) the other project timed 1,400 texts of about 60 characters at
 7.8 seconds, roughly 180 a second; its earlier 4 minutes for 920 texts came
-from long descriptions at the 512-token cut. The first build task is to
-repeat that on the one real list we have, and to check the laptop can install
-`onnxruntime` (§9, question 5). Vectors are cached per document, so
+from long descriptions at the 512-token cut. Vectors are cached per document, so
 the cost is paid once per document, not per session.
 
 Setup, copied from `edmonton-open-data-landscape` so the two match:
 
 - `fastembed==0.8.1` (it brought `onnxruntime` 1.30.0 there); model name
   `BAAI/bge-small-en-v1.5`, which fastembed maps to a quantised file by default;
-  384 dimensions; all other arguments left at their defaults.
+  384 dimensions. One difference from that project: texts are sorted by
+  length and embedded in batches of 32 (see the measurement above); the
+  vectors are the same.
 - `cache_dir` set to `~/.cache/fastembed` — fastembed's own default is a
   temporary directory that can be wiped. The same directory is shared with the
   other project on the server, so nothing is downloaded twice.
@@ -159,8 +165,7 @@ todo/<id>/
 
 `log.jsonl` is the only thing the agent and the UI write. One line per
 decision: who (`agent` or `owner`), when, what (create / rename / merge / split
-a group, move an item, keep or drop an item with a reason, mark an item done,
-set a section in or
+a group, move an item, keep or drop an item with a reason, set a section in or
 out, set a group's distilled wording, mark a group for the owner, **confirm**).
 The current state is the log replayed from the top.
 
@@ -181,7 +186,7 @@ session never has to read a whole document into its context.
 | `sections <id>` | each section with its first guess, a few sample lines, in / out |
 | `groups <id> [--unreviewed] [--limit N]` | group summaries: size, age span, sample items |
 | `show <id> <group>` | one group's items in age order, with their nearest outside neighbours |
-| `rename`, `merge`, `split`, `move`, `keep`, `drop`, `done`, `section`, `draft`, `flag` | the edits, each one log line |
+| `rename`, `merge`, `split`, `move`, `keep`, `drop`, `section`, `draft`, `flag` | the edits, each one log line |
 | `export <id>` | write `distilled.md`; report what is still undecided |
 
 A project skill gives the routine: check status → settle sections → go through
@@ -204,10 +209,7 @@ For final checks, not for doing the sorting by hand.
 
 **The new list** (`distilled.md`): themes as sections, one line per confirmed
 group or kept item, ordered within a section by age; an appendix maps each line
-to the old items it replaces, and lists what was dropped and why. Items marked
-done get their own section at the end, apart from the themes (owner,
-2026-10-05). The Reminders export cannot show done / not-done, so that section
-fills only as the agent proposes and the owner confirms items as done. Re-running
+to the old items it replaces, and lists what was dropped and why. Re-running
 the export after more review rewrites it from the log, so edits belong in the
 UI, not in the exported file.
 
@@ -219,9 +221,9 @@ UI, not in the exported file.
 2. **Age** — **answered 2026-10-05:** for now age only means farther back in
    the list; it marks an item neither as important nor as stale. Read here as
    farther down the list = older; reverse it if the export runs the other way.
-3. **Done items** — **answered 2026-10-05:** they go in a separate section of
-   the new list (the owner expects them to be mostly junk). Still unknown:
-   whether the export includes completed reminders at all.
+3. **Done items** — **answered 2026-10-05:** the owner deleted the completed
+   reminders before exporting, so the list holds none; no done state or done
+   section is needed.
 4. **The agent reads the text.** A Claude Code session grouping your items
    means the item text passes through Claude, as it does in any session. The
    pipeline itself would call no hosted service. `docs/SCOPE.md` has been
