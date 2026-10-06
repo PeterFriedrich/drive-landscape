@@ -250,6 +250,21 @@ For final checks, not for doing the sorting by hand.
 - Keyboard-first — a 1,355-item list is a few hundred groups to step through.
 - Reads and writes only through the same functions as §7, on `127.0.0.1`.
 
+Built (`python -m src.ui <id>`, then http://127.0.0.1:8377/): `src/ui.py`
+serves `web/review.html` and three JSON routes; every action is one log line
+signed `owner`, and the page reads the state again afterwards. The first
+version is arranged by theme, not as a queue: themes down the side (largest
+first, then "In no theme" and "Dropped"), and one theme per screen with its
+groups and its single items. Per item: split (the box pre-filled sentence by
+sentence, one new item per line), keep, drop, theme, group, similar (nearest
+neighbours with one-click "same group" / "same theme"), pull out. Per group
+and theme: confirm, rename, edit the line, move, fold. Undo. Keys: `j` / `k`
+between themes, `u` undo, `/` filter. Not built: the flagged-first queue, the
+preview of the new list, why items were put together, the sections view.
+Requests whose `Host` is not `127.0.0.1` / `localhost` are refused, and the
+write route takes JSON only, so another site open in the browser cannot write
+to the log.
+
 **The new list** (`distilled.md`): themes as sections, one line per confirmed
 group or kept item, ordered within a section by age; an appendix maps each line
 to the old items it replaces, and lists what was dropped and why. Re-running
