@@ -197,3 +197,70 @@ def test_parts_cannot_be_embedded_without_knowing_the_model(root, capsys):
     run(root, capsys, "break", "doc-1", "6", "--who", "owner", "a", "b")
     code, out = run(root, capsys, "show", "doc-1", "1")
     assert code == 1 and "model the items were embedded with is unknown" in out["error"]
+
+
+def test_edits_append_one_line_each_and_number_new_groups_and_themes(root, capsys):
+    run(root, capsys, "propose", "doc-1")  # g1 = 1, 2; t1 = g1 + 3; t2 = 4, 5
+    doc = root / "doc-1"
+    steps = [
+        (("create", "doc-1", "library", "4", "5"), {"group": "g2", "items": [4, 5]}),
+        (("theme", "doc-1", "paper", "g2", "6"), {"theme": "t3", "groups": ["g2"], "items": [6]}),
+        (("split", "doc-1", "g2", "books", "5"), {"new": "g3", "items": [5]}),
+        (("rename", "doc-1", "g3", "library books"), {"group": "g3"}),
+        (("rename", "doc-1", "t3", "desk"), {"theme": "t3"}),
+        (("merge", "doc-1", "g2", "g3"), {"into": "g2", "groups": ["g3"]}),
+        (("move", "doc-1", "3", "g1"), {"item": 3}),
+        (("draft", "doc-1", "g1", "Fix the gate"), {"text": "Fix the gate"}),
+        (("flag", "doc-1", "g1", "latch too?"), {"note": "latch too?"}),
+        (("keep", "doc-1", "6"), {"item": 6}),
+        (("assign", "doc-1", "6", "none"), {"item": 6, "theme": None}),
+        (("assign", "doc-1", "g2", "t1"), {"group": "g2", "theme": "t1"}),
+        (("drop", "doc-1", "6", "not this year"), {"reason": "not this year"}),
+        (("undo", "doc-1"), {}),
+        (("unassign", "doc-1", "6"), {"item": 6}),
+        (("create", "doc-1", "again", "6"), {"group": "g4"}),  # g3 was merged away; its id is not reused
+    ]
+    for argv, fields in steps:
+        code, out = run(root, capsys, *argv)
+        assert code == 0, out
+        assert out["logged"]["who"] == "agent" and out["logged"]["op"] == argv[0]
+        assert fields.items() <= out["logged"].items()
+    st, _ = state.load(doc)
+    assert {gid: g["items"] for gid, g in st["groups"].items()} == {"g1": [1, 2, 3], "g2": [4, 5], "g4": [6]}
+    assert st["themes"] == {"t1": {"name": st["themes"]["t1"]["name"], "groups": ["g1", "g2"], "items": [], "confirmed": False}}
+    assert len(state.read_log(doc / "work" / "log.jsonl")) == 3 + len(steps)
+
+    code, out = run(root, capsys, "fold", "doc-1", "t1", "t9")
+    assert code == 1 and "no theme 't9'" in out["error"]
+    code, out = run(root, capsys, "keep", "doc-1", "g1")
+    assert code == 1 and "not an item: 'g1'" in out["error"]
+    assert len(state.read_log(doc / "work" / "log.jsonl")) == 3 + len(steps)
+
+
+def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
+    run(root, capsys, "propose", "doc-1")
+    doc = root / "doc-1"
+    run(root, capsys, "draft", "doc-1", "g1", "Oil the gate hinge")
+    run(root, capsys, "keep", "doc-1", "3")
+    run(root, capsys, "keep", "doc-1", "5")
+    run(root, capsys, "drop", "doc-1", "6", "not this year")
+    code, out = run(root, capsys, "export", "doc-1")
+    assert code == 0
+    assert {k: v for k, v in out.items() if k != "wrote"} == {
+        "lines": 2, "sections": 2, "dropped": 1, "undecided": 1, "groups_not_confirmed": 1}
+    md = (doc / "work" / "distilled.md").read_text()
+    assert "Oil the gate hinge" not in md and "- fix the gate latch [1]" in md
+    assert "- 6: learn the accordion — not this year" in md
+    assert "1 groups not confirmed (left out" in md
+
+    state.append(doc, {"who": "owner", "op": "confirm", "group": "g1"})
+    run(root, capsys, "export", "doc-1")
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    t1 = state.load(doc)[0]["themes"]["t1"]["name"]
+    start = lines.index(f"## {t1}")
+    assert lines[start + 2 : start + 4] == ["- fix the gate latch [1]", "- Oil the gate hinge [2]"]  # oldest first
+    assert lines[lines.index("**[2]** Oil the gate hinge") + 2 :][:2] == ["- 2: oil the gate hinge today", "- 1: oil the gate hinge"]
+
+    state.append(doc, {"who": "agent", "op": "rename", "group": "g1", "name": "gate"})
+    code, out = run(root, capsys, "export", "doc-1", "--draft")
+    assert out["lines"] == 3 and "- Oil the gate hinge (not confirmed) [2]" in (doc / "work" / "distilled.md").read_text()
