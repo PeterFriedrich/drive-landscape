@@ -21,7 +21,7 @@ _spec.loader.exec_module(make_brief)
 def test_committed_brief_is_current():
     target = REPO / make_brief.BRIEF
     if not target.exists():
-        pytest.skip("no docs/BRIEF.md committed (private repo: the brief is pasted, not synced)")
+        pytest.skip("no docs/BRIEF.md committed (the brief is pasted, not synced)")
     assert target.read_text(encoding="utf-8") == make_brief.build(REPO), (
         "docs/BRIEF.md is stale — its sources changed since it was generated. "
         "Run `python scripts/make_brief.py --write` and commit it in this PR."

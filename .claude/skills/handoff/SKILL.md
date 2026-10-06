@@ -46,8 +46,9 @@ last=$(git log -1 --format=%H -- session-summary/)
 git fetch -q origin && git log --oneline ${last:+$last..}origin/master -- docs/BRIEF.md 'docs/SPEC_*.md' docs/ARCHITECTURE.md data/DATA.md
 ```
 
-Any output → Next Steps item 1 is "**Press Sync in the claude.ai Project**
-(changed on master: <files>)". Also if this session's still-open PR changes
+Any output → Next Steps item 1 is "**Press Sync in the claude.ai Project**",
+followed by the changed repo paths, one per line (the owner ticks paths, not
+descriptions). Also if this session's still-open PR changes
 one: "after merging #N". No output → say nothing about it.
 
 # Output Format
