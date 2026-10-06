@@ -48,11 +48,16 @@ def test_propose_writes_both_levels_and_starts_the_log(root, capsys):
     assert [t["items"] for t in proposal["themes"]] == [[1, 2, 3], [4, 5]]
     assert proposal["settings"]["same_cut"] == 0.25
     log = state.read_log(root / "doc-1" / "work" / "log.jsonl")
-    assert [(e["who"], e["op"], e["items"]) for e in log] == [("proposal", "create", [1, 2])]
-    assert log[0]["name"] in TEXTS[:2]
+    assert [(e["who"], e["op"], e.get("groups"), e["items"]) for e in log] == [
+        ("proposal", "create", None, [1, 2]),
+        ("proposal", "theme", ["g1"], [3]),
+        ("proposal", "theme", [], [4, 5]),
+    ]
+    assert log[0]["name"] in TEXTS[:2] and log[1]["name"] in TEXTS[:3]
 
     code, out = run(root, capsys, "status", "doc-1")
     assert (out["in_groups"], out["undecided"], out["proposed"]) == (2, 4, True)
+    assert (out["themes"], out["in_no_theme"]) == (2, 1)
 
 
 def test_propose_refuses_to_replace_a_proposal(root, capsys):
@@ -85,9 +90,11 @@ def test_themes_are_paged_largest_first(root, capsys):
     run(root, capsys, "propose", "doc-1")
     _, out = run(root, capsys, "themes", "doc-1", "--limit", "1")
     assert (out["total"], out["shown"]) == (2, 1)
+    name = out["themes"][0].pop("name")
+    assert name in TEXTS[:3]
     assert out["themes"][0] == {
-        "theme": "t1", "size": 3, "oldest": 3, "span": [1, 3], "undecided": 1,
-        "sample": [TEXTS[2], TEXTS[1], TEXTS[0]],
+        "theme": "t1", "size": 3, "groups": 1, "oldest": 3, "span": [1, 3], "undecided": 1,
+        "confirmed": False, "sample": [TEXTS[2], TEXTS[1], TEXTS[0]],
     }
     _, out = run(root, capsys, "themes", "doc-1", "--limit", "1", "--offset", "1")
     assert out["themes"][0]["theme"] == "t2"
@@ -103,6 +110,12 @@ def test_show_gives_the_items_and_their_nearest_outside_neighbours(root, capsys)
 
     _, out = run(root, capsys, "show", "doc-1", "t1")
     assert [(it["n"], it["where"]) for it in out["items"]] == [(3, "undecided"), (2, "g1"), (1, "g1")]
+    assert out["groups"] == ["g1"] and {it["theme"] for it in out["items"]} == {"t1"}
+    assert {it["n"]: it["theme"] for it in out["nearest_outside"]}[6] is None
+
+    state.append(root / "doc-1", {"who": "agent", "op": "assign", "item": 6, "theme": "t1"})
+    _, out = run(root, capsys, "show", "doc-1", "t1")
+    assert [it["n"] for it in out["items"]] == [6, 3, 2, 1]
 
     code, out = run(root, capsys, "show", "doc-1", "g99")
     assert code == 1 and "no group, theme or item 'g99'" in out["error"]

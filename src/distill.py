@@ -9,8 +9,8 @@
 
 `propose` needs the vectors from `python -m src.embed <doc>`. It writes
 <doc>/work/proposal.json (both levels, and the settings used) and starts the log
-with one `create` line per same-thing group, signed "proposal". Themes are a
-suggestion read from proposal.json; they are not review state yet.
+with one `create` line per same-thing group and one `theme` line per theme,
+signed "proposal". From then on groups and themes are read from the log.
 
 `break` is the owner's: it splits an item that holds several todos into one
 item per text (src/state.py refuses it from anyone else). `show` on an unbroken
@@ -89,13 +89,6 @@ def _part_vectors(doc: Path, texts: list[str], dimensions: int) -> np.ndarray:
     return np.array([cached[t] for t in texts])
 
 
-def _proposal(doc: Path) -> dict:
-    path = doc / "work" / "proposal.json"
-    if not path.exists():
-        raise DistillError(f"no proposal for this document; run: python -m src.distill propose {doc.name}")
-    return json.loads(path.read_text())
-
-
 def _where(st: dict) -> dict:
     where = {n: gid for gid, g in st["groups"].items() for n in g["items"]}
     where.update({n: "kept" for n in st["kept"]})
@@ -129,7 +122,10 @@ def propose(doc: Path, args) -> dict:
         {"id": f"g{k}", "items": [ns[i] for i in rows], "named_after": ns[grouping.medoid(distance, rows)]}
         for k, rows in enumerate(grouping.members(same), 1)
     ]
-    themes = [{"id": f"t{k}", "items": [ns[i] for i in rows]} for k, rows in enumerate(grouping.members(theme), 1)]
+    themes = [
+        {"id": f"t{k}", "items": [ns[i] for i in rows], "named_after": ns[grouping.medoid(distance, rows)]}
+        for k, rows in enumerate(grouping.members(theme), 1)
+    ]
     counts = {
         "items": len(items),
         "groups": len(groups),
@@ -148,6 +144,14 @@ def propose(doc: Path, args) -> dict:
     text = {it["n"]: it["text"] for it in items}
     for g in groups:
         state.append(doc, {"who": "proposal", "op": "create", "group": g["id"], "name": text[g["named_after"]], "items": g["items"]})
+    group_of = {n: g["id"] for g in groups for n in g["items"]}
+    for t in themes:
+        # One tree cut twice, so a same-thing group never straddles two themes.
+        state.append(doc, {
+            "who": "proposal", "op": "theme", "theme": t["id"], "name": text[t["named_after"]],
+            "groups": sorted({group_of[n] for n in t["items"] if n in group_of}),
+            "items": [n for n in t["items"] if n not in group_of],
+        })
     return counts
 
 
@@ -173,16 +177,21 @@ def groups(doc: Path, args) -> dict:
     return {**page, "groups": shown}
 
 
+def _theme_items(st: dict, t: dict) -> list:
+    return t["items"] + [n for gid in t["groups"] for n in st["groups"][gid]["items"]]
+
+
 def themes(doc: Path, args) -> dict:
     st, _ = state.load(doc)
     where = _where(st)
-    text = {it["n"]: it["text"] for it in read_items(doc / "items.jsonl")}
+    text = {**{it["n"]: it["text"] for it in read_items(doc / "items.jsonl")}, **st["parts"]}
     rows = []
-    for t in _proposal(doc)["themes"]:
-        ordered = oldest_first(t["items"])
+    for tid, t in st["themes"].items():
+        ordered = oldest_first(_theme_items(st, t))
         rows.append({
-            "theme": t["id"], "size": len(ordered), "oldest": ordered[0], "span": [ordered[-1], ordered[0]],
-            "undecided": sum(where[n] == "undecided" for n in ordered),
+            "theme": tid, "name": _clip(t["name"]), "size": len(ordered), "groups": len(t["groups"]),
+            "oldest": ordered[0], "span": [ordered[-1], ordered[0]],
+            "undecided": sum(where[n] == "undecided" for n in ordered), "confirmed": t["confirmed"],
             "sample": [_clip(text[n]) for n in ordered[:3]],
         })
     rows.sort(key=lambda r: -r["size"])
@@ -207,13 +216,14 @@ def show(doc: Path, args) -> dict:
         elif len(sentences(by_n[n]["text"])) > 1:
             head["split"] = sentences(by_n[n]["text"])
         inside = {n}
+    elif args.group in st["themes"]:
+        t = st["themes"][args.group]
+        head = {"theme": args.group, "name": t["name"], "groups": t["groups"], "confirmed": t["confirmed"]}
+        inside = set(_theme_items(st, t))
     else:
-        found = [t for t in _proposal(doc)["themes"] if t["id"] == args.group]
-        if not found:
-            raise DistillError(f"no group, theme or item {args.group!r}")
-        head = {"theme": args.group}
-        inside = set(found[0]["items"])
+        raise DistillError(f"no group, theme or item {args.group!r}")
     where = _where(st)
+    theme_of = {n: tid for tid, t in st["themes"].items() for n in _theme_items(st, t)}
     row = {it["n"]: i for i, it in enumerate(items)}
     vectors = _vectors(doc, originals)
     if st["parts"]:
@@ -221,12 +231,13 @@ def show(doc: Path, args) -> dict:
     distance = grouping.combined_distance(vectors, [it["text"] for it in items])
     inside_rows = [row[n] for n in inside]
     nearest = distance[inside_rows].min(axis=0)
-    # A broken item stays listed where the proposal put it, but its parts stand in for it as a neighbour.
+    # A broken item is no longer an item; its parts stand in for it as neighbours.
     nearest[inside_rows + [row[n] for n in st["broken"]]] = np.inf
     ordered = oldest_first(inside)
 
     def line(n) -> dict:
-        return {"n": n, "text": _clip(by_n[n]["text"]), "detail": by_n[n].get("detail"), "where": where[n]}
+        return {"n": n, "text": _clip(by_n[n]["text"]), "detail": by_n[n].get("detail"),
+                "where": where[n], "theme": theme_of.get(n)}
 
     return {
         **head, "size": len(ordered), "shown": min(len(ordered), args.limit),
@@ -257,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--same-cut", type=float, default=grouping.SAME_CUT)
             p.add_argument("--theme-cut", type=float, default=grouping.THEME_CUT)
         if fn is show:
-            p.add_argument("group", help="a group id (g12), a proposed theme id (t3), an item (412) or a part (412.1)")
+            p.add_argument("group", help="a group id (g12), a theme id (t3), an item (412) or a part (412.1)")
             p.add_argument("--limit", type=int, default=50)
         if fn is break_item:
             p.add_argument("item", help="an item (412) or a part (412.1)")
