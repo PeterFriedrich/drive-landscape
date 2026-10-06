@@ -2,3 +2,4 @@
 # need; pin exact versions and bump in lockstep with requirements.txt.
 pytest==9.0.3
 copier==9.18.2
+numpy==2.5.3

@@ -30,6 +30,8 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - google-api-python-client==2.201.0
 - google-auth-oauthlib==1.5.0
 - pdfplumber==0.11.10
+- fastembed==0.8.1
+- numpy==2.5.3
 
 ## Locked decisions
 
@@ -39,7 +41,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 
 ## Open work
 
-- **Phase 1: distil one document** — spec is a proposal awaiting the owner's answers (`docs/SPEC_phase1_distill.md` §9); build order in its §10, starting with embedding the one real list with bge-small via fastembed (owner's choice) and timing it. Done when the Reminders list has …
+- **Phase 1: distil one document** — spec `docs/SPEC_phase1_distill.md`, the owner's answers in its §9; build order in its §10. Step 1 done (`src/embed.py`: the real list embedded on the laptop in 25 s, 310 MB). Next is step 2: the decision log, replay and the accounted-for check, …
 - **Inventory Drive** — `src/inventory.py` is written and tested against a fake service, but has **not yet run against the real Drive**: the owner needs to create the OAuth client and run it on the laptop (steps in `data/DATA.md`). Done when a snapshot is committed to the private …
 - **Find the todo lists** — a title search finds only a handful; a keyword search of doc text over-matches (100+ docs, mostly notes and reports), so candidates need a content pass. Done when the owner has confirmed the candidate set.
 - **Collect the todo lists** — each list the owner hands over is filed in the private repo under a neutral id with its original, and converted to `items.jsonl` (`data/DATA.md` "Todo lists"). One so far: an Apple Reminders PDF, 1,355 items, converted with `src/reminders_pdf.py`. …

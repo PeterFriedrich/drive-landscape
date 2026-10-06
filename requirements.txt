@@ -7,3 +7,6 @@ google-api-python-client==2.201.0
 google-auth-oauthlib==1.5.0
 # PDF text and layout (src/reminders_pdf.py). MIT. Not in requirements-ci.txt: tests use made-up layouts.
 pdfplumber==0.11.10
+# Embeddings (src/embed.py): ONNX Runtime, no torch. Not in requirements-ci.txt: tests pass a made-up embed function.
+fastembed==0.8.1
+numpy==2.5.3
