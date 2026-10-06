@@ -156,9 +156,11 @@ heading path to the text (the Reminders list has no headings).
 **On the real list, 2026-10-05:** 64 same-thing groups holding 143 of 1,355
 items (54 of them pairs), and 245 themes holding 1,220 items (largest 42; 89
 are pairs), with 135 items in no theme. The list has few rewordings of one
-task, so most of the distilling will happen at the theme level, and themes are
-not review state yet (§6) — that is the gap to close in step 4. Nobody has
-read these groups yet; the cuts were set from the counts alone.
+task, so most of the distilling will happen at the theme level. The cuts were
+set from the counts alone. A first read of the ten largest themes and ten
+groups (2026-10-05): the same-thing groups hold up; the largest themes are
+mixed, because 756 of the 1,355 items hold more than one sentence and often
+more than one todo. Hence `break` (§6) rather than a different cut.
 
 The cuts start as guesses. **The review itself is the labelling:** every
 confirm, merge and split is recorded (§6), so after the first document there is
@@ -194,7 +196,11 @@ recorded. Added at the owner's request: `break`, owner only,
 which replaces one item that holds several todos with one new item per todo
 (`<n>.1`, `<n>.2`, ...); the parts' text lives in the log and each part is
 then placed like any other item. The UI pre-fills the split sentence by
-sentence and the owner corrects it before saving. Not built yet: `section` (no reader produces sections until the
+sentence and the owner corrects it before saving. **Themes are review state
+too** (`theme`, `assign`, `fold`, and `rename` / `confirm` on a theme): a
+theme is a named section holding whole groups and items that stand alone, so
+a part the owner split off has somewhere to go. `propose` seeds them, one
+`theme` line per proposed theme. Not built yet: `section` (no reader produces sections until the
 Markdown one exists).
 
 Why a log rather than one state file: two writers cannot overwrite each other;
@@ -213,7 +219,7 @@ session never has to read a whole document into its context.
 | `ingest <file>` / `propose <id>` | build the blocks / build the proposal |
 | `sections <id>` | each section with its first guess, a few sample lines, in / out |
 | `groups <id> [--unreviewed] [--limit N] [--offset N]` | group summaries: size, age span, sample items |
-| `themes <id> [--limit N] [--offset N]` | the proposed themes, largest first: size, age span, how many items are undecided |
+| `themes <id> [--limit N] [--offset N]` | the themes as they stand in the log, largest first: name, size, groups, age span, how many items are undecided, confirmed |
 | `show <id> <group, theme or item>` | its items in age order, with their nearest outside neighbours; for one item that has several sentences, the sentence-by-sentence split |
 | `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
 | `rename`, `merge`, `split`, `move`, `keep`, `drop`, `section`, `draft`, `flag` | the edits, each one log line |
@@ -221,7 +227,8 @@ session never has to read a whole document into its context.
 
 Built so far (`python -m src.distill`): `status`, `propose`, `groups`,
 `themes`, `show`, `break`. `propose` writes `proposal.json` and starts the log
-with one `create` line per same-thing group, signed `proposal`; it refuses to
+with one `create` line per same-thing group and one `theme` line per theme,
+signed `proposal`; it refuses to
 run over an existing proposal or log.
 
 A project skill gives the routine: check status → settle sections → go through

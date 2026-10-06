@@ -10,7 +10,7 @@ A log line is {"who": "proposal" | "agent" | "owner", "when": ISO time, "op": ..
 fields}; "proposal" is the grouping algorithm (src/distill.py propose):
 
     create    group, name, items   a new group of items that are in no group yet
-    rename    group, name
+    rename    group | theme, name
     merge     into, groups         the items of `groups` join `into`
     split     group, items, new, name   some of a group's items become group `new`
     move      item, group          from wherever the item is
@@ -21,12 +21,20 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
                                    in `parts`, numbered <item>.1, <item>.2, ..., all undecided
     draft     group, text          the group's line in the new list
     flag      group, note          marked for the owner
-    confirm   group | item         owner only; an item must be kept
+    theme     theme, name, groups, items   a new theme: a named section of the new list, holding
+                                   groups and single items that are in no theme yet
+    assign    group | item, theme  into that theme from whichever it was in; theme null: into none
+    fold      into, themes         the members of `themes` join `into`
+    confirm   group | item | theme owner only; an item must be kept
     undo                           ignore the latest line not yet undone
 
 A broken item is no longer placed anywhere; its parts are items like any other
 (a part can be broken again) and carry their text in the log, since items.jsonl
-does not hold them. Changing a confirmed group in any way unconfirms it. A line that makes no sense
+does not hold them. A theme holds whole groups, and items that stand alone
+(undecided or kept): an item that joins a group, is dropped or is broken leaves
+its theme, a group split off another starts in the same theme, and a group or
+theme that loses its last member is gone. Changing a confirmed group in any way
+unconfirms it, and so does changing a confirmed theme's name or members. A line that makes no sense
 stops the replay with its line number; `append` checks a line before writing
 it, so that should only happen to a log edited by hand.
 """
@@ -71,6 +79,42 @@ def order(n) -> tuple:
 
 def _apply(state: dict, known: set, e: dict) -> None:
     groups, kept, dropped, undecided = state["groups"], state["kept"], state["dropped"], state["undecided"]
+    themes = state["themes"]
+
+    def one_of(*keys: str) -> str:
+        given = [k for k in keys if k in e]
+        if len(given) != 1:
+            raise LogError(f"takes one of: {', '.join(keys)}")
+        return given[0]
+
+    def theme(key: str = "theme") -> dict:
+        if e.get(key) not in themes:
+            raise LogError(f"no theme {e.get(key)!r}")
+        return themes[e[key]]
+
+    def themed(kind: str, member) -> str | None:
+        return next((tid for tid, t in themes.items() if member in t[kind]), None)
+
+    def leave(kind: str, member) -> None:
+        tid = themed(kind, member)
+        if tid is not None:
+            themes[tid][kind].remove(member)
+            themes[tid]["confirmed"] = False
+            if not themes[tid]["groups"] and not themes[tid]["items"]:
+                del themes[tid]
+
+    def join(t: dict, kind: str, members: list) -> None:
+        t[kind] = sorted(t[kind] + members, key=order if kind == "items" else None)
+        t["confirmed"] = False
+
+    def loose(n):
+        if n not in known:
+            raise LogError(f"no item {n!r}")
+        if home(n) is not None:
+            raise LogError(f"item {n} is in group {home(n)!r}; a theme takes the group")
+        if n in dropped:
+            raise LogError(f"item {n} is dropped")
+        return n
 
     def group(key: str = "group") -> dict:
         if e.get(key) not in groups:
@@ -104,16 +148,19 @@ def _apply(state: dict, known: set, e: dict) -> None:
     def home(n: int) -> str | None:
         return next((gid for gid, g in groups.items() if n in g["items"]), None)
 
-    def take(n: int) -> None:
+    def take(n: int, themed: bool = False) -> None:
         undecided.discard(n)
         kept.pop(n, None)
         dropped.pop(n, None)
+        if not themed:
+            leave("items", n)
         gid = home(n)
         if gid is not None:
             groups[gid]["items"].remove(n)
             groups[gid]["confirmed"] = False
             if not groups[gid]["items"]:
                 del groups[gid]
+                leave("groups", gid)
 
     def put(g: dict, ns: list) -> None:
         g["items"] = sorted(g["items"] + ns, key=order)
@@ -132,8 +179,8 @@ def _apply(state: dict, known: set, e: dict) -> None:
             take(n)
         put(g, ns)
     elif op == "rename":
-        g = group()
-        g["name"], g["confirmed"] = _text(e, "name"), False
+        target = group() if one_of("group", "theme") == "group" else theme()
+        target["name"], target["confirmed"] = _text(e, "name"), False
     elif op == "merge":
         into = group("into")
         for gid in e.get("groups") or [None]:
@@ -142,6 +189,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
             if gid not in groups:
                 raise LogError(f"no group {gid!r}")
             put(into, groups.pop(gid)["items"])
+            leave("groups", gid)
     elif op == "split":
         g, ns = group(), items()
         for n in ns:
@@ -153,6 +201,8 @@ def _apply(state: dict, known: set, e: dict) -> None:
         for n in ns:
             take(n)
         put(new, ns)
+        if themed("groups", e["group"]) is not None:
+            join(themes[themed("groups", e["group"])], "groups", [e["new"]])
     elif op == "move":
         n, g = item(), group()
         if n not in g["items"]:
@@ -161,7 +211,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
     elif op == "keep":
         n = item()
         if n not in kept:
-            take(n)
+            take(n, themed=True)
             kept[n] = {"confirmed": False}
     elif op == "drop":
         n, reason = item(), _text(e, "reason")
@@ -169,7 +219,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
         dropped[n] = reason
     elif op == "unassign":
         n = item()
-        take(n)
+        take(n, themed=True)
         undecided.add(n)
     elif op == "break":
         if e["who"] != "owner":
@@ -191,14 +241,57 @@ def _apply(state: dict, known: set, e: dict) -> None:
         g["draft"], g["confirmed"] = _text(e, "text"), False
     elif op == "flag":
         group()["flag"] = _text(e, "note")
+    elif op == "theme":
+        tid, name = _text(e, "theme"), _text(e, "name")
+        if tid in themes:
+            raise LogError(f"theme {tid!r} already exists")
+        gids, ns = e.get("groups") or [], e.get("items") or []
+        if not gids and not ns:
+            raise LogError("groups and items are both empty")
+        if len(set(gids)) != len(gids) or len(set(ns)) != len(ns):
+            raise LogError("a member repeats")
+        for kind, members in (("groups", gids), ("items", ns)):
+            for m in members:
+                if kind == "groups" and m not in groups:
+                    raise LogError(f"no group {m!r}")
+                if kind == "items":
+                    loose(m)
+                if themed(kind, m) is not None:
+                    raise LogError(f"{m!r} is already in theme {themed(kind, m)!r}")
+        themes[tid] = {"name": name, "groups": [], "items": [], "confirmed": False}
+        join(themes[tid], "groups", gids)
+        join(themes[tid], "items", ns)
+    elif op == "assign":
+        kind = one_of("group", "item") + "s"
+        if kind == "groups":
+            group()
+        member = e["group"] if kind == "groups" else loose(e["item"])
+        tid = e.get("theme")
+        if tid is not None:
+            theme()
+        if themed(kind, member) != tid:
+            leave(kind, member)
+            if tid is not None:
+                join(themes[tid], kind, [member])
+    elif op == "fold":
+        into = theme("into")
+        for tid in e.get("themes") or [None]:
+            if tid == e["into"]:
+                raise LogError(f"cannot fold {tid!r} into itself")
+            if tid not in themes:
+                raise LogError(f"no theme {tid!r}")
+            gone = themes.pop(tid)
+            join(into, "groups", gone["groups"])
+            join(into, "items", gone["items"])
     elif op == "confirm":
         if e["who"] != "owner":
             raise LogError("only the owner confirms")
-        if ("group" in e) == ("item" in e):
-            raise LogError("confirm takes a group or an item, one of them")
-        if "group" in e:
+        kind = one_of("group", "item", "theme")
+        if kind == "group":
             g = group()
             g["confirmed"], g["flag"] = True, None
+        elif kind == "theme":
+            theme()["confirmed"] = True
         else:
             n = item()
             if n not in kept:
@@ -219,7 +312,7 @@ def replay(item_ns: list, entries: list[dict]) -> dict:
         else:
             live.append((i, e))
     known = set(item_ns)
-    state = {"groups": {}, "kept": {}, "dropped": {}, "undecided": set(item_ns), "broken": {}, "parts": {}}
+    state = {"groups": {}, "kept": {}, "dropped": {}, "undecided": set(item_ns), "broken": {}, "parts": {}, "themes": {}}
     for i, e in live:
         try:
             _apply(state, known, e)
@@ -231,7 +324,8 @@ def replay(item_ns: list, entries: list[dict]) -> dict:
 def account(item_ns: list, state: dict) -> dict:
     """Counts, after checking every item is in exactly one place: a group, kept, dropped or undecided.
 
-    A broken item is in none of them; each of its parts must be in one.
+    A broken item is in none of them; each of its parts must be in one. A theme's members must exist,
+    stand where a theme can hold them, and be in no other theme.
     """
     repeats = sorted(n for n, c in Counter(item_ns).items() if c > 1)
     if repeats:
@@ -250,6 +344,18 @@ def account(item_ns: list, state: dict) -> dict:
         ns = sorted(ns, key=order)
         if ns:
             raise LogError(f"{len(ns)} items {problem}: {ns[:10]}")
+    themes = state["themes"]
+    alone = set(state["kept"]) | set(state["undecided"])
+    themed_groups = Counter(gid for t in themes.values() for gid in t["groups"])
+    themed_items = Counter(n for t in themes.values() for n in t["items"])
+    for problem, found in (
+        ("themes are empty", [tid for tid, t in themes.items() if not t["groups"] and not t["items"]]),
+        ("themes hold a group that does not exist", [tid for tid, t in themes.items() if not set(t["groups"]) <= set(groups)]),
+        ("themes hold an item that is grouped, dropped, broken or unknown", [tid for tid, t in themes.items() if not set(t["items"]) <= alone]),
+        ("members are in more than one theme", [m for counts in (themed_groups, themed_items) for m, c in counts.items() if c > 1]),
+    ):
+        if found:
+            raise LogError(f"{len(found)} {problem}: {found[:10]}")
     return {
         "items": len(item_ns),
         "in_groups": len(in_groups),
@@ -262,6 +368,9 @@ def account(item_ns: list, state: dict) -> dict:
         "groups_confirmed": sum(g["confirmed"] for g in groups.values()),
         "groups_flagged": sum(g["flag"] is not None for g in groups.values()),
         "kept_confirmed": sum(k["confirmed"] for k in state["kept"].values()),
+        "themes": len(themes),
+        "themes_confirmed": sum(t["confirmed"] for t in themes.values()),
+        "in_no_theme": len(groups) - len(themed_groups) + len(alone) - len(themed_items),
     }
 
 

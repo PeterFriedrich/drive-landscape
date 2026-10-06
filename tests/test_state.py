@@ -29,6 +29,7 @@ def test_empty_log_leaves_everything_undecided():
     assert account(NS, state) == {
         "items": 6, "in_groups": 0, "kept": 0, "dropped": 0, "undecided": 6, "broken": 0, "parts": 0,
         "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0,
+        "themes": 0, "themes_confirmed": 0, "in_no_theme": 6,
     }
 
 
@@ -135,7 +136,7 @@ def test_undo_ignores_the_line_before_it():
     (agent("split", group="g1", items=[4], new="g3", name="x"), "item 4 is not in group 'g1'"),
     (agent("merge", into="g1", groups=["g1"]), "cannot merge 'g1' into itself"),
     (owner("confirm", item=6), "item 6 is not kept"),
-    (owner("confirm", group="g1", item=5), "confirm takes a group or an item"),
+    (owner("confirm", group="g1", item=5), "takes one of: group, item, theme"),
 ])
 def test_a_line_that_makes_no_sense_stops_the_replay(entry, message):
     with pytest.raises(LogError, match=f"line 4: .*{message}"):
@@ -211,6 +212,98 @@ def test_account_catches_a_lost_part():
     state = replay(NS, BASE + [owner("break", item=6, parts=["a", "b"])])
     state["undecided"].discard("6.2")
     with pytest.raises(LogError, match=r"not accounted for: \['6.2'\]"):
+        account(NS, state)
+
+
+THEMED = BASE + [agent("theme", theme="t1", name="outdoors", groups=["g1"], items=[6]),
+                 agent("theme", theme="t2", name="desk", groups=["g2"], items=[5])]
+
+
+def test_a_theme_holds_groups_and_items_that_stand_alone():
+    state = replay(NS, THEMED)
+    assert state["themes"]["t1"] == {"name": "outdoors", "groups": ["g1"], "items": [6], "confirmed": False}
+    counts = account(NS, state)
+    assert (counts["themes"], counts["themes_confirmed"], counts["in_no_theme"]) == (2, 0, 0)
+    assert account(NS, replay(NS, BASE))["in_no_theme"] == 4  # g1, g2, kept 5, undecided 6
+
+
+def test_assign_fold_and_rename_a_theme():
+    state = replay(NS, THEMED + [
+        agent("assign", item=6, theme="t2"),
+        agent("assign", item=5, theme=None),
+        agent("rename", theme="t2", name="paper"),
+    ])
+    assert state["themes"]["t1"]["items"] == [] and state["themes"]["t2"]["items"] == [6]
+    assert state["themes"]["t2"]["name"] == "paper"
+    assert account(NS, state)["in_no_theme"] == 1
+    state = replay(NS, THEMED + [agent("fold", into="t1", themes=["t2"])])
+    assert state["themes"] == {"t1": {"name": "outdoors", "groups": ["g1", "g2"], "items": [5, 6], "confirmed": False}}
+
+
+def test_an_item_leaves_its_theme_when_it_stops_standing_alone():
+    for edit in (agent("move", item=6, group="g2"), agent("drop", item=6, reason="x"),
+                 owner("break", item=6, parts=["a", "b"])):
+        state = replay(NS, THEMED + [edit])
+        assert state["themes"]["t1"]["items"] == []
+        account(NS, state)
+    for edit in (agent("keep", item=6), agent("unassign", item=5)):
+        state = replay(NS, THEMED + [edit])
+        assert (state["themes"]["t1"]["items"], state["themes"]["t2"]["items"]) == ([6], [5])
+        account(NS, state)
+
+
+def test_groups_carry_their_theme_through_split_and_lose_it_when_they_go():
+    state = replay(NS, THEMED + [agent("split", group="g1", items=[1], new="g3", name="shed")])
+    assert state["themes"]["t1"]["groups"] == ["g1", "g3"]
+    state = replay(NS, THEMED + [agent("merge", into="g1", groups=["g2"])])
+    assert state["themes"]["t1"]["groups"] == ["g1"] and state["themes"]["t2"]["groups"] == []
+    state = replay(NS, THEMED + [agent("assign", item=5, theme="t1"), agent("keep", item=4)])
+    assert "t2" not in state["themes"]  # g2 emptied, and with it the theme
+    account(NS, state)
+
+
+@pytest.mark.parametrize("edit", [
+    agent("rename", theme="t1", name="yard"),
+    agent("assign", item=5, theme="t1"),
+    agent("assign", group="g1", theme="t2"),
+    agent("fold", into="t1", themes=["t2"]),
+    agent("drop", item=6, reason="x"),
+    agent("split", group="g1", items=[1], new="g3", name="shed"),
+])
+def test_changing_a_confirmed_theme_unconfirms_it(edit):
+    confirmed = THEMED + [owner("confirm", theme="t1")]
+    assert replay(NS, confirmed)["themes"]["t1"]["confirmed"] is True
+    assert replay(NS, confirmed + [edit])["themes"]["t1"]["confirmed"] is False
+    # Work inside a member group is not a change to the theme.
+    assert replay(NS, confirmed + [agent("draft", group="g1", text="x")])["themes"]["t1"]["confirmed"] is True
+
+
+@pytest.mark.parametrize("entry, message", [
+    (agent("confirm", theme="t1"), "only the owner confirms"),
+    (agent("theme", theme="t1", name="x", items=[5]), "theme 't1' already exists"),
+    (agent("theme", theme="t3", name="x"), "groups and items are both empty"),
+    (agent("theme", theme="t3", name="x", items=[6]), "6 is already in theme 't1'"),
+    (agent("theme", theme="t3", name="x", groups=["g9"]), "no group 'g9'"),
+    (agent("theme", theme="t3", name="x", items=[1]), "item 1 is in group 'g1'; a theme takes the group"),
+    (agent("assign", item=1, theme="t1"), "item 1 is in group 'g1'"),
+    (agent("assign", item=6, theme="t9"), "no theme 't9'"),
+    (agent("assign", item=6, group="g1", theme="t1"), "takes one of: group, item"),
+    (agent("fold", into="t1", themes=["t1"]), "cannot fold 't1' into itself"),
+    (agent("rename", name="x"), "takes one of: group, theme"),
+])
+def test_a_theme_line_that_makes_no_sense_is_refused(entry, message):
+    with pytest.raises(LogError, match=f"line 6: .*{message}"):
+        replay(NS, THEMED + [entry])
+
+
+def test_account_catches_a_theme_holding_what_it_cannot():
+    state = replay(NS, THEMED)
+    state["themes"]["t2"]["items"].append(6)
+    with pytest.raises(LogError, match=r"members are in more than one theme: \[6\]"):
+        account(NS, state)
+    state = replay(NS, THEMED)
+    state["themes"]["t1"]["items"].append(1)
+    with pytest.raises(LogError, match=r"grouped, dropped, broken or unknown: \['t1'\]"):
         account(NS, state)
 
 
