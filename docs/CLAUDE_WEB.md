@@ -9,15 +9,31 @@ built from `CLAUDE.md`, `docs/SCOPE.md`, `docs/DECISIONS.md`, `TODO.md`,
 is never re-typed by hand and cannot silently go stale. It ends with a required
 reply format whose tables map onto `TODO.md` / `DECISIONS.md` rows.
 
-## Public repo: sync the brief into a claude.ai Project
+**"What do I sync?" is answered with paths.** The owner ticks files in the
+claude.ai Project's GitHub picker, so a session replies with the repo-relative
+paths to tick, one per line, before anything else — not file copies, uploads
+or descriptions:
+
+```
+docs/BRIEF.md
+docs/SPEC_<name>.md
+data/DATA.md
+```
+
+The picker shows only what is on the **default branch**: flag any path still
+in an unmerged PR ("after merging #N"), or the owner goes looking for a file
+that isn't there yet.
+
+## Sync the brief into a claude.ai Project
 
 1. Commit the brief once: `python scripts/make_brief.py --write`.
    From then on `tests/test_brief.py` fails the merge gate whenever
    `docs/BRIEF.md` no longer matches its sources; the fix is to re-run
    `--write` in the same PR.
 2. In claude.ai, use a **private** Project (the GitHub integration is not
-   offered on a shared one) and add the repo from GitHub. Select the
-   **synced set** below. Add `CLAUDE.md` or `TODO.md` in full only if the
+   offered on a shared one) and add the repo from GitHub. Tick the paths of
+   the **synced set** below. This works for a private repo too (the owner's,
+   2026-10-05). Add `CLAUDE.md` or `TODO.md` in full only if the
    project's capacity allows — the brief already summarises both.
 3. ⚠️ **The sync is manual.** claude.ai fetches the files when you press
    **Sync now**, not on push. A green merge gate means the *repo's* files are
@@ -45,19 +61,22 @@ Claude web has no hooks, so the reminder comes from the Claude Code side, at
 the two points the owner already reads:
 
 - **A PR that changes a synced file opens its description with**
-  "**After merge: press Sync in the claude.ai Project.**" claude.ai reads
-  master, so merge is the moment it goes stale.
+  "**After merge: press Sync in the claude.ai Project.**" followed by the
+  changed synced paths, one per line. claude.ai reads master, so merge is the
+  moment it goes stale.
 - **`/handoff` checks** whether a synced file changed on master since the
-  previous handoff, and if so makes that the first Next Step.
+  previous handoff, and if so makes that the first Next Step, with the paths.
 
 The integration reads file contents only — no history, PRs or issues. A
 research chat that needs one of those gets it pasted.
 
-## Private repo: paste it
+## Fallback: paste it
 
-The GitHub integration has been reported to authenticate and then 404 on
-private repos (anthropics/claude-code #98050, open as of 2026-09-29). Don't
-commit `docs/BRIEF.md`; instead run
+Only if the GitHub integration fails for a repo. It was reported to
+authenticate and then 404 on private repos (anthropics/claude-code #98050,
+open as of 2026-09-29), but the owner synced a private repo through it on
+2026-10-05, so try the picker first. If it fails, don't commit
+`docs/BRIEF.md`; instead run
 
 ```bash
 python scripts/make_brief.py | xclip -selection clipboard   # or: > /tmp/brief.md

@@ -16,11 +16,13 @@ the repo already maintains:
 
 Two ways to use it (setup in ``docs/CLAUDE_WEB.md``):
 
-  - **Public repo:** ``--write`` commits ``docs/BRIEF.md``, and a claude.ai
-    Project syncs it through the GitHub integration. ``tests/test_brief.py``
-    fails the merge gate when the committed file no longer matches.
-  - **Private repo** (the integration 404s on private repos, anthropics/claude-code
-    #98050): run with no flag and paste the output into the chat.
+  - **Synced** (the default, public or private repo): ``--write`` commits
+    ``docs/BRIEF.md``, and a claude.ai Project syncs it through the GitHub
+    integration. ``tests/test_brief.py`` fails the merge gate when the
+    committed file no longer matches.
+  - **Pasted** (fallback, if the integration fails for the repo; reported on
+    private repos, anthropics/claude-code #98050): run with no flag and paste
+    the output into the chat.
 
 The output carries no date or commit SHA on purpose: it must be a pure function
 of the source files, or the staleness test would fail on every commit.
