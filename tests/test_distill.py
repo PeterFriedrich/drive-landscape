@@ -1,5 +1,6 @@
 """src/distill.py end to end on a made-up document with hand-made vectors."""
 import json
+import os
 
 import numpy as np
 import pytest
@@ -142,6 +143,26 @@ def test_show_on_an_item_suggests_a_split_only_when_it_has_several_sentences(roo
     assert [it["n"] for it in out["items"]] == [6]
     assert 6 not in [it["n"] for it in out["nearest_outside"]]
     assert "split" not in run(root, capsys, "show", "doc-1", "1")[1]
+
+
+def test_distances_are_worked_out_once_until_the_parts_or_the_vectors_change(root, capsys, embedded, monkeypatch):
+    run(root, capsys, "propose", "doc-1")
+    built = []
+    real = distill.grouping.combined_distance
+    monkeypatch.setattr(distill.grouping, "combined_distance", lambda v, texts: built.append(len(texts)) or real(v, texts))
+    monkeypatch.setattr(distill, "_distance_cache", (None, None))
+    first = run(root, capsys, "show", "doc-1", "3")[1]
+    assert run(root, capsys, "show", "doc-1", "3")[1] == first and run(root, capsys, "show", "doc-1", "g1")[0] == 0
+    assert built == [6]
+    run(root, capsys, "keep", "doc-1", "3")  # a decision that changes no text
+    assert run(root, capsys, "show", "doc-1", "3")[0] == 0 and built == [6]
+    run(root, capsys, "break", "doc-1", "6", "--who", "owner", "oil the gate hinge again", "renew the library card too")
+    assert run(root, capsys, "show", "doc-1", "6.1")[1]["nearest_outside"][0]["n"] in (1, 2)
+    assert built == [6, 8]
+    vectors = root / "doc-1" / "work" / "vectors.npy"
+    os.utime(vectors, ns=(1, vectors.stat().st_mtime_ns + 1))
+    run(root, capsys, "show", "doc-1", "3")
+    assert built == [6, 8, 8]
 
 
 @pytest.fixture
