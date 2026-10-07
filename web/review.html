@@ -117,6 +117,7 @@ const themeName = (tid) => { const t = S.themes.find((t) => t.id === tid); retur
 const groupItems = (gid) => S.groups[gid].items.map((n) => S.items[String(n)]);
 const themeItems = (t) => t.items.map((n) => S.items[String(n)]);
 const themeSize = (t) => t.items.length + t.groups.reduce((a, gid) => a + S.groups[gid].items.length, 0);
+const themeLater = (tid) => S.themes.some((t) => t.id === tid && t.later);
 const alone = (it) => it.where === "undecided" || it.where === "kept";
 
 function sections() {
@@ -162,29 +163,30 @@ function itemRow(it, inGroup) {
     if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }))));
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
-    if (!inGroup) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
+    if (!inGroup && !themeLater(it.theme)) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
     acts.append(btn("Drop", () => { const reason = prompt("Why drop it?"); if (reason) send({ op: "drop", item: it.n, reason }); }));
   }
-  return el("div", { class: "row" + (it.later ? " later" : "") },
+  const later = it.later || (!inGroup && it.where === "kept" && themeLater(it.theme));
+  return el("div", { class: "row" + (later ? " later" : "") },
     el("span", { class: "n" }, "#" + it.n),
     el("span", { class: "tx" }, it.text,
       it.where === "kept" ? badge(it.confirmed ? "kept ✓" : "kept", "ok") : null,
-      it.later ? badge("later") : null,
+      later ? badge("later") : null,
       it.where === "dropped" ? badge(it.reason, "warn") : null),
     acts);
 }
 
 function groupCard(gid) {
-  const g = S.groups[gid];
+  const g = S.groups[gid], later = g.later || themeLater(g.theme);
   const head = el("div", { class: "head" }, el("b", {}, g.draft || g.name), badge(gid),
-    g.confirmed ? badge("confirmed", "ok") : null, g.later ? badge("later") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
+    g.confirmed ? badge("confirmed", "ok") : null, later ? badge("later") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
   const bar = el("div", { class: "bar" },
     g.confirmed ? null : btn("Confirm group", () => send({ op: "confirm", group: gid }), "main"),
     btn("Edit line", () => { const text = prompt("The line in the new list:", g.draft || g.name); if (text) send({ op: "draft", group: gid, text }); }),
     btn("Rename", () => { const name = prompt("Group name:", g.name); if (name) send({ op: "rename", group: gid, name }); }),
     btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }))),
-    btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
-  return el("div", { class: "card" + (g.confirmed ? " done" : "") + (g.later ? " later" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
+    themeLater(g.theme) ? null : btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
+  return el("div", { class: "card" + (g.confirmed ? " done" : "") + (later ? " later" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
 }
 
 function renderMain() {
@@ -202,8 +204,8 @@ function renderMain() {
   if (current === DROPPED) {
     out.push(el("h2", {}, "Dropped"), el("div", { class: "card" }, ...items().filter((it) => it.where === "dropped").map((it) => itemRow(it, false))));
   } else if (current === LATER) {
-    const loose = items().filter((it) => it.later);
-    out.push(el("h2", {}, "Later"), ...Object.keys(S.groups).filter((gid) => S.groups[gid].later).map(groupCard));
+    const loose = items().filter((it) => it.later || (it.where === "kept" && themeLater(it.theme)));
+    out.push(el("h2", {}, "Later"), ...Object.keys(S.groups).filter((gid) => S.groups[gid].later || themeLater(S.groups[gid].theme)).map(groupCard));
     if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
   } else if (current === NONE) {
     const groups = Object.keys(S.groups).filter((gid) => S.groups[gid].theme === null);
@@ -212,10 +214,15 @@ function renderMain() {
     if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
   } else {
     const t = S.themes.find((t) => t.id === current);
-    out.push(el("h2", {}, t.name, " ", badge(t.id), t.confirmed ? badge("confirmed", "ok") : null));
+    out.push(el("h2", {}, t.name, " ", badge(t.id), t.confirmed ? badge("confirmed", "ok") : null, t.later ? badge("later") : null));
     out.push(el("div", { class: "bar" },
       t.confirmed ? null : btn("Confirm theme", () => send({ op: "confirm", theme: t.id }), "main"),
       btn("Rename", () => { const name = prompt("Theme name:", t.name); if (name) send({ op: "rename", theme: t.id, name }); }),
+      btn(t.later ? "Not later" : "Later", () => {
+        const open = themeItems(t).filter((it) => it.where === "undecided").length;
+        if (t.later || !open || confirm(`Mark the whole theme Later? Its ${open} undecided item${open === 1 ? "" : "s"} will be kept. Move any that do not belong first.`))
+          send({ op: "later", theme: t.id, on: !t.later });
+      }),
       btn("Fold into…", () => pickTheme("Fold this theme into which one?", (tid) => { if (tid) send({ op: "fold", into: tid, themes: [t.id] }).then((ok) => { if (ok) { current = tid; render(); } }); }, t.id))));
     out.push(...t.groups.map(groupCard));
     if (t.items.length) out.push(el("h3", {}, `Items on their own (${t.items.length})`), el("div", { class: "card" }, ...themeItems(t).map((it) => itemRow(it, false))));

@@ -21,8 +21,10 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
                                    in `parts`, numbered <item>.1, <item>.2, ..., all undecided
     draft     group, text          the group's line in the new list
     flag      group, note          marked for the owner
-    later     group | item, on     on true: its line goes in the "Later" section at the bottom of
-                                   the new list; an undecided item is kept by it. on false: unmarked
+    later     group | item | theme, on   on true: its line goes in the "Later" section at the bottom of
+                                   the new list; an undecided item is kept by it. on false: unmarked.
+                                   A theme: every line of the theme goes there, and its undecided
+                                   items are kept
     theme     theme, name, groups, items   a new theme: a named section of the new list, holding
                                    groups and single items that are in no theme yet
     assign    group | item, theme  into that theme from whichever it was in; theme null: into none
@@ -39,7 +41,10 @@ theme that loses its last member is gone. Changing a confirmed group in any way
 unconfirms it, and so does changing a confirmed theme's name or members; a flag
 or a later mark changes neither. A later mark stays with its group or kept item
 (a group split off a marked group is marked too) and goes when the item stops
-being kept. A line that makes no sense
+being kept. A later mark on a theme stays with the theme: what joins the theme
+afterwards is later too (an undecided item that joins is not kept by that), what
+leaves it is not, and a theme folded into another takes the other's mark. A line
+that makes no sense
 stops the replay with its line number; `append` checks a line before writing
 it, so that should only happen to a log edited by hand.
 """
@@ -223,8 +228,16 @@ def _apply(state: dict, known: set, e: dict) -> None:
         on = e.get("on")
         if not isinstance(on, bool):
             raise LogError("on must be true or false")
-        if one_of("group", "item") == "group":
+        kind = one_of("group", "item", "theme")
+        if kind == "group":
             group()["later"] = on
+        elif kind == "theme":
+            t = theme()
+            t["later"] = on
+            for n in t["items"] if on else []:
+                if n in undecided:
+                    undecided.discard(n)
+                    kept[n] = {"confirmed": False, "later": False}
         else:
             n = loose(e["item"])
             if n not in kept:
@@ -278,7 +291,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
                     loose(m)
                 if themed(kind, m) is not None:
                     raise LogError(f"{m!r} is already in theme {themed(kind, m)!r}")
-        themes[tid] = {"name": name, "groups": [], "items": [], "confirmed": False}
+        themes[tid] = {"name": name, "groups": [], "items": [], "later": False, "confirmed": False}
         join(themes[tid], "groups", gids)
         join(themes[tid], "items", ns)
     elif op == "assign":
@@ -388,7 +401,10 @@ def account(item_ns: list, state: dict) -> dict:
         "groups_confirmed": sum(g["confirmed"] for g in groups.values()),
         "groups_flagged": sum(g["flag"] is not None for g in groups.values()),
         "kept_confirmed": sum(k["confirmed"] for k in state["kept"].values()),
-        "later": sum(x["later"] for x in list(groups.values()) + list(state["kept"].values())),
+        "later": len({("g", gid) for gid, g in groups.items() if g["later"]}
+                     | {("i", n) for n, k in state["kept"].items() if k["later"]}
+                     | {(kind[0], m) for t in themes.values() if t["later"] for kind in ("groups", "items")
+                        for m in t[kind] if kind == "groups" or m in state["kept"]}),
         "themes": len(themes),
         "themes_confirmed": sum(t["confirmed"] for t in themes.values()),
         "in_no_theme": len(groups) - len(themed_groups) + len(alone) - len(themed_items),

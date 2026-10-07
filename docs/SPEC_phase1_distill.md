@@ -259,7 +259,9 @@ groups and its single items. Per item: split (the box pre-filled sentence by
 sentence, one new item per line), keep, drop, theme, group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
-per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Undo. Keys: `j` / `k`
+per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:
+**Later** for the whole theme, which asks first when the theme holds undecided items,
+since they will be kept. Undo. Keys: `j` / `k`
 between themes, `u` undo, `/` filter. Every decision is written to the log
 file at once; **Save** (`POST /api/save`) commits the log in the repository
 that holds the document and pushes it, and is the only thing that does: the
@@ -272,11 +274,14 @@ to the log.
 **The new list** (`distilled.md`): themes as sections, one line per confirmed
 group or kept item, ordered within a section by age; an appendix maps each line
 to the old items it replaces, and lists what was dropped and why. A group or
-kept item marked **later** (`later <id> <group or item> on|off`; the owner's
+kept item marked **later** (`later <id> <group, item or theme> on|off`; the owner's
 word for de-prioritized) stays on the list: its line leaves its theme's section
 for one "Later" section after all the themes, with the theme's name after it.
 Marking an undecided item later keeps it; an item inside a group is not marked
-on its own. The mark does not unconfirm anything. Re-running
+on its own. The mark does not unconfirm anything. Marking a theme later is one
+log line: every line of the theme goes to the "Later" section and the theme's
+undecided items are kept. The mark stays with the theme, so what joins it
+afterwards is later too and what leaves it is not. Re-running
 the export after more review rewrites it from the log, so edits belong in the
 UI, not in the exported file.
 

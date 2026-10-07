@@ -221,7 +221,7 @@ THEMED = BASE + [agent("theme", theme="t1", name="outdoors", groups=["g1"], item
 
 def test_a_theme_holds_groups_and_items_that_stand_alone():
     state = replay(NS, THEMED)
-    assert state["themes"]["t1"] == {"name": "outdoors", "groups": ["g1"], "items": [6], "confirmed": False}
+    assert state["themes"]["t1"] == {"name": "outdoors", "groups": ["g1"], "items": [6], "later": False, "confirmed": False}
     counts = account(NS, state)
     assert (counts["themes"], counts["themes_confirmed"], counts["in_no_theme"]) == (2, 0, 0)
     assert account(NS, replay(NS, BASE))["in_no_theme"] == 4  # g1, g2, kept 5, undecided 6
@@ -237,7 +237,7 @@ def test_assign_fold_and_rename_a_theme():
     assert state["themes"]["t2"]["name"] == "paper"
     assert account(NS, state)["in_no_theme"] == 1
     state = replay(NS, THEMED + [agent("fold", into="t1", themes=["t2"])])
-    assert state["themes"] == {"t1": {"name": "outdoors", "groups": ["g1", "g2"], "items": [5, 6], "confirmed": False}}
+    assert state["themes"] == {"t1": {"name": "outdoors", "groups": ["g1", "g2"], "items": [5, 6], "later": False, "confirmed": False}}
 
 
 def test_an_item_leaves_its_theme_when_it_stops_standing_alone():
@@ -351,7 +351,21 @@ def test_a_later_mark_follows_a_split_and_goes_when_the_item_is_no_longer_kept()
     assert state["kept"][5]["later"] is False
 
 
+def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
+    marked = THEMED + [owner("confirm", theme="t1"), owner("later", theme="t1", on=True)]
+    state = replay(NS, marked)
+    assert state["themes"]["t1"]["later"] is True and state["themes"]["t1"]["confirmed"] is True
+    assert state["kept"][6] == {"confirmed": False, "later": False} and state["groups"]["g1"]["later"] is False
+    counts = account(NS, state)
+    assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)  # g1 and item 6
+    assert account(NS, replay(NS, marked + [owner("assign", item=6, theme="t2")]))["later"] == 1
+    state = replay(NS, marked + [owner("later", theme="t1", on=False)])
+    assert account(NS, state)["later"] == 0 and 6 in state["kept"]
+    assert 6 in replay(NS, marked + [owner("undo")])["undecided"]
+
+
 @pytest.mark.parametrize("entry, message", [
+    (owner("later", theme="t9", on=True), "no theme 't9'"),
     (owner("later", item=1, on=True), "item 1 is in group 'g1'"),
     (owner("later", item=6, on=False), "item 6 is not kept"),
     (owner("later", group="g9", on=True), "no group 'g9'"),

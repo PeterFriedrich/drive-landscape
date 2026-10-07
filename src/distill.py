@@ -314,7 +314,8 @@ def _new_theme(doc: Path, a) -> dict:
 def _later(doc: Path, a) -> dict:
     if a.on not in ("on", "off"):
         raise DistillError(f"later takes on or off, not {a.on!r}")
-    return {**_member(a.member), "on": a.on == "on"}
+    target = {"theme": a.member} if a.member in state.load(doc)[0]["themes"] else _member(a.member)
+    return {**target, "on": a.on == "on"}
 
 
 # Each edit: its arguments (a trailing + takes one or more), and the log fields they become.
@@ -352,7 +353,7 @@ def export(doc: Path, args) -> dict:
 
     def place(key: tuple, marked: bool, ns: list, line: str) -> None:
         tid = section_of.get(key)
-        if marked:
+        if marked or (tid is not None and st["themes"][tid]["later"]):
             later.append((ns, line + (f" ({st['themes'][tid]['name']})" if tid is not None else "")))
         else:
             sections.setdefault(tid, []).append((ns, line))
