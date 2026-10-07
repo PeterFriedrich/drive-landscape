@@ -79,8 +79,8 @@ def test_groups_lists_oldest_first_and_can_leave_out_reviewed_ones(root, capsys)
     _, out = run(root, capsys, "groups", "doc-1")
     assert (out["total"], out["shown"]) == (1, 1)
     g = out["groups"][0]
-    assert (g["group"], g["size"], g["oldest"], g["span"], g["confirmed"]) == ("g1", 2, 2, [1, 2], False)
-    assert g["sample"] == [TEXTS[1], TEXTS[0]]
+    assert (g["group"], g["size"], g["oldest"], g["span"], g["confirmed"]) == ("g1", 2, 1, [1, 2], False)
+    assert g["sample"] == [TEXTS[0], TEXTS[1]]
 
     state.append(root / "doc-1", {"who": "agent", "op": "draft", "group": "g1", "text": "Oil the gate hinge"})
     assert run(root, capsys, "groups", "doc-1", "--unreviewed")[1]["total"] == 0
@@ -94,8 +94,8 @@ def test_themes_are_paged_largest_first(root, capsys):
     name = out["themes"][0].pop("name")
     assert name in TEXTS[:3]
     assert out["themes"][0] == {
-        "theme": "t1", "size": 3, "groups": 1, "oldest": 3, "span": [1, 3], "undecided": 1,
-        "confirmed": False, "sample": [TEXTS[2], TEXTS[1], TEXTS[0]],
+        "theme": "t1", "size": 3, "groups": 1, "oldest": 1, "span": [1, 3], "undecided": 1,
+        "confirmed": False, "sample": [TEXTS[0], TEXTS[1], TEXTS[2]],
     }
     _, out = run(root, capsys, "themes", "doc-1", "--limit", "1", "--offset", "1")
     assert out["themes"][0]["theme"] == "t2"
@@ -104,19 +104,19 @@ def test_themes_are_paged_largest_first(root, capsys):
 def test_show_gives_the_items_and_their_nearest_outside_neighbours(root, capsys):
     run(root, capsys, "propose", "doc-1")
     _, out = run(root, capsys, "show", "doc-1", "g1")
-    assert [it["n"] for it in out["items"]] == [2, 1]
+    assert [it["n"] for it in out["items"]] == [1, 2]
     assert out["nearest_outside"][0]["n"] == 3
     assert out["nearest_outside"][0]["where"] == "undecided"
     assert all(it["n"] not in (1, 2) for it in out["nearest_outside"])
 
     _, out = run(root, capsys, "show", "doc-1", "t1")
-    assert [(it["n"], it["where"]) for it in out["items"]] == [(3, "undecided"), (2, "g1"), (1, "g1")]
+    assert [(it["n"], it["where"]) for it in out["items"]] == [(1, "g1"), (2, "g1"), (3, "undecided")]
     assert out["groups"] == ["g1"] and {it["theme"] for it in out["items"]} == {"t1"}
     assert {it["n"]: it["theme"] for it in out["nearest_outside"]}[6] is None
 
     state.append(root / "doc-1", {"who": "agent", "op": "assign", "item": 6, "theme": "t1"})
     _, out = run(root, capsys, "show", "doc-1", "t1")
-    assert [it["n"] for it in out["items"]] == [6, 3, 2, 1]
+    assert [it["n"] for it in out["items"]] == [1, 2, 3, 6]
 
     code, out = run(root, capsys, "show", "doc-1", "g99")
     assert code == 1 and "no group, theme or item 'g99'" in out["error"]
@@ -204,8 +204,8 @@ def test_break_makes_parts_that_show_among_their_neighbours(root, capsys, embedd
 
     state.append(root / "doc-1", {"who": "agent", "op": "move", "item": "6.1", "group": "g1"})
     g = run(root, capsys, "groups", "doc-1")[1]["groups"][0]
-    assert (g["size"], g["oldest"], g["span"]) == (3, "6.1", [1, "6.1"])
-    assert g["sample"][0] == "oil the gate hinge again"
+    assert (g["size"], g["oldest"], g["span"]) == (3, 1, [1, "6.1"])
+    assert g["sample"][-1] == "oil the gate hinge again"
 
 
 def test_break_is_refused_from_anyone_but_the_owner(root, capsys):
@@ -279,12 +279,12 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     lines = (doc / "work" / "distilled.md").read_text().splitlines()
     t1 = state.load(doc)[0]["themes"]["t1"]["name"]
     start = lines.index(f"## {t1}")
-    assert lines[start + 2 : start + 4] == ["- fix the gate latch [1]", "- Oil the gate hinge [2]"]  # oldest first
-    assert lines[lines.index("**[2]** Oil the gate hinge") + 2 :][:2] == ["- 2: oil the gate hinge today", "- 1: oil the gate hinge"]
+    assert lines[start + 2 : start + 4] == ["- Oil the gate hinge [1]", "- fix the gate latch [2]"]  # oldest first
+    assert lines[lines.index("**[1]** Oil the gate hinge") + 2 :][:2] == ["- 1: oil the gate hinge", "- 2: oil the gate hinge today"]
 
     state.append(doc, {"who": "agent", "op": "rename", "group": "g1", "name": "gate"})
     code, out = run(root, capsys, "export", "doc-1", "--draft")
-    assert out["lines"] == 3 and "- Oil the gate hinge (not confirmed) [2]" in (doc / "work" / "distilled.md").read_text()
+    assert out["lines"] == 3 and "- Oil the gate hinge (not confirmed) [1]" in (doc / "work" / "distilled.md").read_text()
 
     assert run(root, capsys, "later", "doc-1", "g1", "maybe")[0] == 1
     run(root, capsys, "later", "doc-1", "g1", "on")
