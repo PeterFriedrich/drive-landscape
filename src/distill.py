@@ -53,8 +53,8 @@ class DistillError(Exception):
 
 
 def oldest_first(ns) -> list:
-    # Read for now as: farther down the list is older (SPEC_phase1_distill §9, question 2).
-    return sorted(ns, key=state.order, reverse=True)
+    # The top of the list is the oldest entry (the owner, SPEC_phase1_distill §9, question 2).
+    return sorted(ns, key=state.order)
 
 
 def sentences(text: str) -> list[str]:
@@ -203,10 +203,10 @@ def groups(doc: Path, args) -> dict:
         ordered = oldest_first(g["items"])
         rows.append({
             "group": gid, "name": _clip(g["name"]), "size": len(ordered), "oldest": ordered[0],
-            "span": [ordered[-1], ordered[0]], "draft": g["draft"], "flag": g["flag"],
+            "span": [ordered[0], ordered[-1]], "draft": g["draft"], "flag": g["flag"],
             "confirmed": g["confirmed"], "sample": [_clip(text[n]) for n in ordered[:3]],
         })
-    rows.sort(key=lambda r: state.order(r["oldest"]), reverse=True)
+    rows.sort(key=lambda r: state.order(r["oldest"]))
     page, shown = _page(rows, args)
     return {**page, "groups": shown}
 
@@ -224,7 +224,7 @@ def themes(doc: Path, args) -> dict:
         ordered = oldest_first(_theme_items(st, t))
         rows.append({
             "theme": tid, "name": _clip(t["name"]), "size": len(ordered), "groups": len(t["groups"]),
-            "oldest": ordered[0], "span": [ordered[-1], ordered[0]],
+            "oldest": ordered[0], "span": [ordered[0], ordered[-1]],
             "undecided": sum(where[n] == "undecided" for n in ordered), "confirmed": t["confirmed"],
             "sample": [_clip(text[n]) for n in ordered[:3]],
         })
@@ -370,7 +370,7 @@ def export(doc: Path, args) -> dict:
     titled = [(st["themes"][tid]["name"] if tid is not None else "In no theme", sections[tid]) for tid in order]
     for title, rows in titled + ([("Later", later)] if later else []):
         out += [f"## {title}", ""]
-        for ns, line in sorted(rows, key=lambda row: state.order(row[0][0]), reverse=True):
+        for ns, line in sorted(rows, key=lambda row: state.order(row[0][0])):
             k += 1
             out.append(f"- {line} [{k}]")
             appendix += [f"**[{k}]** {line}", ""] + [f"- {n}: {text[n]}" for n in ns] + [""]

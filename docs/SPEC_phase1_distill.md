@@ -296,8 +296,10 @@ UI, not in the exported file.
    is the only axis for now; no second label for the *kind* of item (task,
    idea, someday, thing to buy, reference) or its tone.
 2. **Age** — **answered 2026-10-05:** for now age only means farther back in
-   the list; it marks an item neither as important nor as stale. Read here as
-   farther down the list = older; reverse it if the export runs the other way.
+   the list; it marks an item neither as important nor as stale. **Direction
+   answered 2026-10-07:** the top of the first page is the oldest entry, and
+   entries get newer down each page and on later pages. (Until then it was read
+   the other way round.)
 3. **Done items** — **answered 2026-10-05:** the owner deleted the completed
    reminders before exporting, so the list holds none; no done state or done
    section is needed.
