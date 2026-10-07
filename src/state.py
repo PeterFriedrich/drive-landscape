@@ -15,7 +15,7 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
     split     group, items, new, name   some of a group's items become group `new`
     move      item, group          from wherever the item is
     keep      item                 stays in the new list on its own
-    drop      item, reason
+    drop      item | theme, reason   a theme: every item in it, those inside its groups too
     unassign  item                 back to undecided
     break     item, parts          owner only; the item becomes one new item per text
                                    in `parts`, numbered <item>.1, <item>.2, ..., all undecided
@@ -247,9 +247,15 @@ def _apply(state: dict, known: set, e: dict) -> None:
                 kept[n] = {"draft": None, "confirmed": False, "later": False}
             kept[n]["later"] = on
     elif op == "drop":
-        n, reason = item(), _text(e, "reason")
-        take(n)
-        dropped[n] = reason
+        reason = _text(e, "reason")
+        if one_of("item", "theme") == "item":
+            ns = [item()]
+        else:
+            t = theme()
+            ns = t["items"] + [n for gid in t["groups"] for n in groups[gid]["items"]]
+        for n in ns:
+            take(n)
+            dropped[n] = reason
     elif op == "unassign":
         n = item()
         take(n, themed=True)

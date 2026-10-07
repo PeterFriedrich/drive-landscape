@@ -226,6 +226,10 @@ function renderMain() {
         if (t.later || !open || confirm(`Mark the whole theme Later? Its ${open} undecided item${open === 1 ? "" : "s"} will be kept. Move any that do not belong first.`))
           send({ op: "later", theme: t.id, on: !t.later });
       }),
+      btn("Drop theme", () => {
+        const reason = prompt(`Drop all ${themeSize(t)} items in this theme, the ones inside its ${t.groups.length} groups too? Move any that do not belong first. Why drop them?`);
+        if (reason) send({ op: "drop", theme: t.id, reason });
+      }),
       btn("Fold into…", () => pickTheme("Fold this theme into which one?", (tid) => { if (tid) send({ op: "fold", into: tid, themes: [t.id] }).then((ok) => { if (ok) { current = tid; render(); } }); }, t.id))));
     out.push(...t.groups.map(groupCard));
     if (t.items.length) out.push(el("h3", {}, `Items on their own (${t.items.length})`), el("div", { class: "card" }, ...themeItems(t).map((it) => itemRow(it, false))));

@@ -312,3 +312,6 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     run(root, capsys, "export", "doc-1", "--draft")
     lines = (doc / "work" / "distilled.md").read_text().splitlines()
     assert sum(l.startswith("- Mend the back fence") for l in lines) == 1 and old in lines  # the old text is still what it replaces
+
+    assert run(root, capsys, "drop", "doc-1", t1_id, "not this year")[0] == 0
+    assert state.read_log(doc / "work" / "log.jsonl")[-1]["theme"] == t1_id and t1_id not in state.load(doc)[0]["themes"]

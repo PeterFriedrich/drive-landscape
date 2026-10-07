@@ -363,6 +363,20 @@ def test_draft_rewords_a_kept_item_keeps_an_undecided_one_and_unconfirms():
             replay(NS, BASE + [entry])
 
 
+def test_drop_on_a_theme_drops_every_item_in_it_and_one_undo_brings_them_back():
+    dropping = THEMED + [owner("later", theme="t1", on=True), owner("drop", theme="t1", reason="not this year")]
+    state = replay(NS, dropping)
+    assert state["dropped"] == {n: "not this year" for n in (1, 2, 3, 6)}
+    assert set(state["themes"]) == {"t2"} and set(state["groups"]) == {"g2"}
+    counts = account(NS, state)
+    assert (counts["dropped"], counts["later"], counts["in_groups"]) == (4, 0, 1)
+    state = replay(NS, dropping + [owner("undo")])
+    assert state["themes"]["t1"]["groups"] == ["g1"] and not state["dropped"]
+    for entry, message in ((owner("drop", theme="t9", reason="x"), "no theme 't9'"), (owner("drop", theme="t1", item=6, reason="x"), "takes one of")):
+        with pytest.raises(LogError, match=message):
+            replay(NS, THEMED + [entry])
+
+
 def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
     marked = THEMED + [owner("confirm", theme="t1"), owner("later", theme="t1", on=True)]
     state = replay(NS, marked)

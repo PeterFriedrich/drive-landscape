@@ -12,7 +12,7 @@ and the edits, each one line appended to the log, signed --who (default agent):
 
     create NAME ITEM...        rename GROUP|THEME NAME     merge INTO GROUP...
     split GROUP NAME ITEM...   move ITEM GROUP             keep ITEM
-    drop ITEM REASON           unassign ITEM               draft GROUP|ITEM TEXT
+    drop ITEM|THEME REASON          unassign ITEM               draft GROUP|ITEM TEXT
     flag GROUP NOTE            theme NAME MEMBER...        assign MEMBER THEME|none
     fold INTO THEME...         undo
 
@@ -326,7 +326,7 @@ EDITS = {
     "split": ("group name items+", lambda doc, a: {"group": a.group, "items": [_item(x) for x in a.items], "new": _next_id(doc, "g"), "name": a.name}),
     "move": ("item group", lambda doc, a: {"item": _item(a.item), "group": a.group}),
     "keep": ("item", lambda doc, a: {"item": _item(a.item)}),
-    "drop": ("item reason", lambda doc, a: {"item": _item(a.item), "reason": a.reason}),
+    "drop": ("item reason", lambda doc, a: {**({"theme": a.item} if a.item in state.load(doc)[0]["themes"] else {"item": _item(a.item)}), "reason": a.reason}),
     "unassign": ("item", lambda doc, a: {"item": _item(a.item)}),
     "draft": ("member text", lambda doc, a: {**_member(a.member), "text": a.text}),
     "flag": ("group note", lambda doc, a: {"group": a.group, "note": a.note}),

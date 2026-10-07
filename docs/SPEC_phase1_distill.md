@@ -261,7 +261,8 @@ neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
 per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:
 **Later** for the whole theme, which asks first when the theme holds undecided items,
-since they will be kept. Undo. Keys: `j` / `k`
+since they will be kept; **Drop theme**, which drops every item in the theme (those
+inside its groups too) for one reason, as one log line that one Undo reverses. Undo. Keys: `j` / `k`
 between themes, `u` undo, `/` filter. Every decision is written to the log
 file at once; **Save** (`POST /api/save`) commits the log in the repository
 that holds the document and pushes it, and is the only thing that does: the
