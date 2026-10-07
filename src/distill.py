@@ -101,6 +101,28 @@ def _part_vectors(doc: Path, texts: list[str], dimensions: int) -> np.ndarray:
     return np.array([cached[t] for t in texts])
 
 
+_distance_cache: tuple = (None, None)
+
+
+def _distance(doc: Path, originals: list[dict], parts: dict) -> np.ndarray:
+    """Distances between every two items, the originals first and then the parts. Read-only.
+
+    The review server asks for the same matrix on every click, so the latest one is kept
+    until the vectors, an item's text or the parts change.
+    """
+    global _distance_cache
+    vectors = _vectors(doc, originals)
+    texts = [it["text"] for it in originals] + list(parts.values())
+    key = (str(doc), (doc / "work" / "vectors.npy").stat().st_mtime_ns, tuple(texts))
+    if _distance_cache[0] != key:
+        if parts:
+            vectors = np.vstack([vectors, _part_vectors(doc, list(parts.values()), vectors.shape[1])])
+        matrix = grouping.combined_distance(vectors, texts)
+        matrix.flags.writeable = False
+        _distance_cache = (key, matrix)
+    return _distance_cache[1]
+
+
 def _where(st: dict) -> dict:
     where = {n: gid for gid, g in st["groups"].items() for n in g["items"]}
     where.update({n: "kept" for n in st["kept"]})
@@ -237,10 +259,7 @@ def show(doc: Path, args) -> dict:
     where = _where(st)
     theme_of = {n: tid for tid, t in st["themes"].items() for n in _theme_items(st, t)}
     row = {it["n"]: i for i, it in enumerate(items)}
-    vectors = _vectors(doc, originals)
-    if st["parts"]:
-        vectors = np.vstack([vectors, _part_vectors(doc, list(st["parts"].values()), vectors.shape[1])])
-    distance = grouping.combined_distance(vectors, [it["text"] for it in items])
+    distance = _distance(doc, originals, st["parts"])
     inside_rows = [row[n] for n in inside]
     nearest = distance[inside_rows].min(axis=0)
     # A broken item is no longer an item; its parts stand in for it as neighbours.

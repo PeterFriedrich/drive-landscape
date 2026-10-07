@@ -173,7 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     doc = args.root / args.id
-    state.load(doc)  # fail now, not on the first click
+    st, _ = state.load(doc)  # fail now, not on the first click
+    distill._distance(doc, read_items(doc / "items.jsonl"), st["parts"])  # so the first Similar is not the slow one
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(doc))
     log.info("review page for %s at http://127.0.0.1:%d/  (Ctrl-C to stop)", args.id, server.server_port)
     try:
