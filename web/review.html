@@ -26,7 +26,7 @@ h3 { margin:22px 0 6px; font-size:13px; color:var(--soft); font-weight:600; text
 .bar { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; }
 .card.done { border-color:var(--ok); }
-.later > .tx, .card.later > .head b { opacity:.6; }
+.later > .tx, .card.later > .head b, nav .t.later .nm { opacity:.6; }
 .card .head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
 .card .head b { font-size:15px; }
 .row { display:flex; gap:10px; padding:6px 4px; border-top:1px solid var(--line); align-items:flex-start; }
@@ -122,7 +122,7 @@ const themeLater = (tid) => S.themes.some((t) => t.id === tid && t.later);
 const alone = (it) => it.where === "undecided" || it.where === "kept";
 
 function sections() {
-  const rows = S.themes.map((t) => ({ id: t.id, name: t.name, size: themeSize(t), done: t.confirmed })).sort((a, b) => b.size - a.size);
+  const rows = S.themes.map((t) => ({ id: t.id, name: t.name, size: themeSize(t), done: t.confirmed, later: t.later })).sort((a, b) => a.later - b.later || b.size - a.size);
   const looseItems = items().filter((it) => alone(it) && it.theme === null).length;
   const looseGroups = Object.values(S.groups).filter((g) => g.theme === null).length;
   rows.push({ id: NONE, name: "In no theme", size: looseItems + looseGroups });
@@ -143,8 +143,8 @@ function render() {
   const q = $("#filter").value.trim().toLowerCase();
   const list = $("#themes");
   list.replaceChildren(...rows.filter((r) => !q || r.name.toLowerCase().includes(q) || r.id === current).map((r) =>
-    el("div", { class: "t" + (r.id === current ? " on" : ""), on: { click: () => { current = r.id; render(); $("#main").scrollTop = 0; } } },
-      el("span", { class: "nm", title: r.name }, r.name), el("span", { class: "ct" }, (r.done ? "✓ " : "") + r.size))));
+    el("div", { class: "t" + (r.id === current ? " on" : "") + (r.later ? " later" : ""), on: { click: () => { current = r.id; render(); $("#main").scrollTop = 0; } } },
+      el("span", { class: "nm", title: r.name }, r.name), el("span", { class: "ct" }, (r.later ? "later · " : "") + (r.done ? "✓ " : "") + r.size))));
   const on = list.querySelector(".on");
   if (on) on.scrollIntoView({ block: "nearest" });
   renderMain();
