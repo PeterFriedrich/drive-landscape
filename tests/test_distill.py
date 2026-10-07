@@ -248,7 +248,7 @@ def test_edits_append_one_line_each_and_number_new_groups_and_themes(root, capsy
         assert fields.items() <= out["logged"].items()
     st, _ = state.load(doc)
     assert {gid: g["items"] for gid, g in st["groups"].items()} == {"g1": [1, 2, 3], "g2": [4, 5], "g4": [6]}
-    assert st["themes"] == {"t1": {"name": st["themes"]["t1"]["name"], "groups": ["g1", "g2"], "items": [], "confirmed": False}}
+    assert st["themes"] == {"t1": {"name": st["themes"]["t1"]["name"], "groups": ["g1", "g2"], "items": [], "later": False, "confirmed": False}}
     assert len(state.read_log(doc / "work" / "log.jsonl")) == 3 + len(steps)
 
     code, out = run(root, capsys, "fold", "doc-1", "t1", "t9")
@@ -298,3 +298,11 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     assert len(gate) == 1 and last < gate[0] < lines.index("## What each line replaces")
     assert lines[gate[0]].startswith(f"- Oil the gate hinge (not confirmed) ({t1}) [")
     assert lines[lines.index(f"## {t1}") + 2 :][:2] == ["- fix the gate latch [1]", ""]
+
+    run(root, capsys, "later", "doc-1", t1_id := next(iter(state.load(doc)[0]["themes"])), "on")
+    assert state.read_log(doc / "work" / "log.jsonl")[-1]["theme"] == t1_id
+    run(root, capsys, "export", "doc-1", "--draft")
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    assert f"## {t1}" not in lines
+    latch = [i for i, l in enumerate(lines) if l.startswith(f"- fix the gate latch ({t1}) [")]
+    assert len(latch) == 1 and lines.index("## Later") < latch[0] < lines.index("## What each line replaces")
