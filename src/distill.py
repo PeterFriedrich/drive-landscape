@@ -12,7 +12,7 @@ and the edits, each one line appended to the log, signed --who (default agent):
 
     create NAME ITEM...        rename GROUP|THEME NAME     merge INTO GROUP...
     split GROUP NAME ITEM...   move ITEM GROUP             keep ITEM
-    drop ITEM REASON           unassign ITEM               draft GROUP TEXT
+    drop ITEM REASON           unassign ITEM               draft GROUP|ITEM TEXT
     flag GROUP NOTE            theme NAME MEMBER...        assign MEMBER THEME|none
     fold INTO THEME...         undo
 
@@ -328,7 +328,7 @@ EDITS = {
     "keep": ("item", lambda doc, a: {"item": _item(a.item)}),
     "drop": ("item reason", lambda doc, a: {"item": _item(a.item), "reason": a.reason}),
     "unassign": ("item", lambda doc, a: {"item": _item(a.item)}),
-    "draft": ("group text", lambda doc, a: {"group": a.group, "text": a.text}),
+    "draft": ("member text", lambda doc, a: {**_member(a.member), "text": a.text}),
     "flag": ("group note", lambda doc, a: {"group": a.group, "note": a.note}),
     "later": ("member on", _later),
     "theme": ("name members+", _new_theme),
@@ -363,7 +363,7 @@ def export(doc: Path, args) -> dict:
             line = (g["draft"] or g["name"]) + ("" if g["confirmed"] else " (not confirmed)")
             place(("g", gid), g["later"], oldest_first(g["items"]), line)
     for n, k in st["kept"].items():
-        place(("i", n), k["later"], [n], text[n])
+        place(("i", n), k["later"], [n], k["draft"] or text[n])
     # Largest section first, items in no theme last; within a section, oldest first.
     order = sorted(sections, key=lambda tid: (tid is None, -len(sections[tid]), str(tid)))
     out, appendix, k = [f"# {doc.name}, distilled", ""], [], 0

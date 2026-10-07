@@ -19,7 +19,7 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
     unassign  item                 back to undecided
     break     item, parts          owner only; the item becomes one new item per text
                                    in `parts`, numbered <item>.1, <item>.2, ..., all undecided
-    draft     group, text          the group's line in the new list
+    draft     group | item, text   its line in the new list; an undecided item is kept by it
     flag      group, note          marked for the owner
     later     group | item | theme, on   on true: its line goes in the "Later" section at the bottom of
                                    the new list; an undecided item is kept by it. on false: unmarked.
@@ -223,7 +223,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
         n = item()
         if n not in kept:
             take(n, themed=True)
-            kept[n] = {"confirmed": False, "later": False}
+            kept[n] = {"draft": None, "confirmed": False, "later": False}
     elif op == "later":
         on = e.get("on")
         if not isinstance(on, bool):
@@ -237,14 +237,14 @@ def _apply(state: dict, known: set, e: dict) -> None:
             for n in t["items"] if on else []:
                 if n in undecided:
                     undecided.discard(n)
-                    kept[n] = {"confirmed": False, "later": False}
+                    kept[n] = {"draft": None, "confirmed": False, "later": False}
         else:
             n = loose(e["item"])
             if n not in kept:
                 if not on:
                     raise LogError(f"item {n} is not kept")
                 take(n, themed=True)
-                kept[n] = {"confirmed": False, "later": False}
+                kept[n] = {"draft": None, "confirmed": False, "later": False}
             kept[n]["later"] = on
     elif op == "drop":
         n, reason = item(), _text(e, "reason")
@@ -270,8 +270,15 @@ def _apply(state: dict, known: set, e: dict) -> None:
             known.add(pid)
             undecided.add(pid)
     elif op == "draft":
-        g = group()
-        g["draft"], g["confirmed"] = _text(e, "text"), False
+        if one_of("group", "item") == "group":
+            target = group()
+        else:
+            n = loose(e["item"])
+            if n not in kept:
+                take(n, themed=True)
+                kept[n] = {"draft": None, "confirmed": False, "later": False}
+            target = kept[n]
+        target["draft"], target["confirmed"] = _text(e, "text"), False
     elif op == "flag":
         group()["flag"] = _text(e, "note")
     elif op == "theme":

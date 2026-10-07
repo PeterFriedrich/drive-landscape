@@ -44,6 +44,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - **2026-10-05** — Themes are review state in the log, not only a suggestion in `proposal.json`: a theme is a named section holding whole groups and items that stand alone (undecided or kept); only the owner confirms … Rejected: themes holding kept items only (the proposal would have to keep 1,077 items nobody has looked at to seed them).
 - **2026-10-06** — "Later" is a third outcome beside kept and dropped: a mark on a group or a kept item (`later`, on or off) that keeps it on the new list, in one "Later" section below all the themes, tagged with its … Rejected: de-prioritized items leaving the list like dropped ones without a reason (the owner: on the list, at the bottom).
 - **2026-10-06** — "Later" also takes a whole theme (`later` with `theme`): one log line that sends every line of the theme to the "Later" section and keeps the theme's undecided items; the page asks first when there … Rejected: leaving the theme's undecided items undecided (the owner: keep them all; they move outliers out first, and a warning is enough).
+- **2026-10-06** — A single item can be reworded: `draft` takes an item as well as a group, and the wording is the item's line on the new list while its original text stays in `items.jsonl` and in the appendix. … Rejected: using split for it (split needs two or more parts) and a group of one as the way to reword.
 
 ## Open work
 

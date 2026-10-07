@@ -256,7 +256,7 @@ signed `owner`, and the page reads the state again afterwards. The first
 version is arranged by theme, not as a queue: themes down the side (largest
 first, then "In no theme" and "Dropped"), and one theme per screen with its
 groups and its single items. Per item: split (the box pre-filled sentence by
-sentence, one new item per line), keep, drop, theme, group, similar (nearest
+sentence, one new item per line), keep, drop, edit the line, theme, group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
 per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:
@@ -278,7 +278,11 @@ kept item marked **later** (`later <id> <group, item or theme> on|off`; the owne
 word for de-prioritized) stays on the list: its line leaves its theme's section
 for one "Later" section after all the themes, with the theme's name after it.
 Marking an undecided item later keeps it; an item inside a group is not marked
-on its own. The mark does not unconfirm anything. Marking a theme later is one
+on its own. The mark does not unconfirm anything. A kept item can be given its
+own line (`draft <id> <item> <text>`, "Edit line" on the page), as a group can:
+the new list shows that wording and the appendix still shows the old text.
+Rewording an undecided item keeps it, and rewording a confirmed one unconfirms
+it. Marking a theme later is one
 log line: every line of the theme goes to the "Later" section and the theme's
 undecided items are kept. The mark stays with the theme, so what joins it
 afterwards is later too and what leaves it is not. Re-running

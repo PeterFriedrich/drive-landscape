@@ -306,3 +306,9 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     assert f"## {t1}" not in lines
     latch = [i for i, l in enumerate(lines) if l.startswith(f"- fix the gate latch ({t1}) [")]
     assert len(latch) == 1 and lines.index("## Later") < latch[0] < lines.index("## What each line replaces")
+
+    old = next(l for l in lines if l.startswith("- 3: "))
+    run(root, capsys, "draft", "doc-1", "3", "Mend the back fence")
+    run(root, capsys, "export", "doc-1", "--draft")
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    assert sum(l.startswith("- Mend the back fence") for l in lines) == 1 and old in lines  # the old text is still what it replaces

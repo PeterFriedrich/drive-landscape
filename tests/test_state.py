@@ -339,7 +339,7 @@ def test_later_marks_a_group_or_a_kept_item_and_keeps_an_undecided_one():
         owner("later", item=5, on=False),
     ])
     assert state["groups"]["g1"]["later"] is True and state["groups"]["g1"]["confirmed"] is True
-    assert state["kept"] == {5: {"confirmed": False, "later": False}, 6: {"confirmed": False, "later": True}}
+    assert state["kept"] == {5: {"draft": None, "confirmed": False, "later": False}, 6: {"draft": None, "confirmed": False, "later": True}}
     counts = account(NS, state)
     assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)
 
@@ -351,11 +351,23 @@ def test_a_later_mark_follows_a_split_and_goes_when_the_item_is_no_longer_kept()
     assert state["kept"][5]["later"] is False
 
 
+def test_draft_rewords_a_kept_item_keeps_an_undecided_one_and_unconfirms():
+    state = replay(NS, BASE + [owner("confirm", item=5), owner("draft", item=5, text="file the forms"), owner("draft", item=6, text="buy stamps")])
+    assert state["kept"] == {5: {"draft": "file the forms", "confirmed": False, "later": False},
+                             6: {"draft": "buy stamps", "confirmed": False, "later": False}}
+    assert account(NS, state)["undecided"] == 0
+    state = replay(NS, BASE + [owner("draft", item=5, text="file the forms"), owner("unassign", item=5), owner("keep", item=5)])
+    assert state["kept"][5]["draft"] is None
+    for entry, message in ((owner("draft", item=1, text="x"), "item 1 is in group 'g1'"), (owner("draft", item=5, text=" "), "text is empty")):
+        with pytest.raises(LogError, match=message):
+            replay(NS, BASE + [entry])
+
+
 def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
     marked = THEMED + [owner("confirm", theme="t1"), owner("later", theme="t1", on=True)]
     state = replay(NS, marked)
     assert state["themes"]["t1"]["later"] is True and state["themes"]["t1"]["confirmed"] is True
-    assert state["kept"][6] == {"confirmed": False, "later": False} and state["groups"]["g1"]["later"] is False
+    assert state["kept"][6] == {"draft": None, "confirmed": False, "later": False} and state["groups"]["g1"]["later"] is False
     counts = account(NS, state)
     assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)  # g1 and item 6
     assert account(NS, replay(NS, marked + [owner("assign", item=6, theme="t2")]))["later"] == 1

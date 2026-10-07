@@ -34,6 +34,7 @@ h3 { margin:22px 0 6px; font-size:13px; color:var(--soft); font-weight:600; text
 .row .n { color:var(--soft); font-size:12px; min-width:52px; padding-top:2px; font-variant-numeric:tabular-nums; }
 .row .tx { flex:1; white-space:pre-wrap; overflow-wrap:anywhere; }
 .row .acts { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; max-width:420px; }
+.row .was { display:block; color:var(--soft); font-size:12px; }
 .badge { font-size:11px; padding:1px 6px; border-radius:9px; border:1px solid var(--line); color:var(--soft); white-space:nowrap; }
 .badge.ok { color:var(--ok); border-color:var(--ok); }
 .badge.warn { color:var(--warn); border-color:var(--warn); }
@@ -160,6 +161,7 @@ function itemRow(it, inGroup) {
       if (!it.confirmed) acts.append(btn("Confirm", () => send({ op: "confirm", item: it.n }), "main"));
       acts.append(btn("Unkeep", () => send({ op: "unassign", item: it.n })));
     } else acts.append(btn("Keep", () => send({ op: "keep", item: it.n })));
+    if (!inGroup) acts.append(btn("Edit line", () => { const text = prompt("The line in the new list:", it.draft || it.text); if (text && text !== (it.draft || it.text)) send({ op: "draft", item: it.n, text }); }));
     if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }))));
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
@@ -169,10 +171,11 @@ function itemRow(it, inGroup) {
   const later = it.later || (!inGroup && it.where === "kept" && themeLater(it.theme));
   return el("div", { class: "row" + (later ? " later" : "") },
     el("span", { class: "n" }, "#" + it.n),
-    el("span", { class: "tx" }, it.text,
+    el("span", { class: "tx" }, it.draft || it.text,
       it.where === "kept" ? badge(it.confirmed ? "kept ✓" : "kept", "ok") : null,
       later ? badge("later") : null,
-      it.where === "dropped" ? badge(it.reason, "warn") : null),
+      it.where === "dropped" ? badge(it.reason, "warn") : null,
+      it.draft ? el("span", { class: "was" }, "was: " + it.text) : null),
     acts);
 }
 
