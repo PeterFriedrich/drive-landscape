@@ -256,7 +256,8 @@ signed `owner`, and the page reads the state again afterwards. The first
 version is arranged by theme, not as a queue: themes down the side (largest
 first, then "In no theme" and "Dropped"), and one theme per screen with its
 groups and its single items. Per item: split (the box pre-filled sentence by
-sentence, one new item per line), keep, drop, edit the line, theme, group, similar (nearest
+sentence, one new item per line), keep, drop, edit the line, theme (an existing one or a
+new one named on the spot, also per group), group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
 per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:

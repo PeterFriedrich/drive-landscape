@@ -26,7 +26,7 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
                                    A theme: every line of the theme goes there, and its undecided
                                    items are kept
     theme     theme, name, groups, items   a new theme: a named section of the new list, holding
-                                   groups and single items that are in no theme yet
+                                   groups and single items, each from whichever theme it was in
     assign    group | item, theme  into that theme from whichever it was in; theme null: into none
     fold      into, themes         the members of `themes` join `into`
     confirm   group | item | theme owner only; an item must be kept
@@ -302,8 +302,9 @@ def _apply(state: dict, known: set, e: dict) -> None:
                     raise LogError(f"no group {m!r}")
                 if kind == "items":
                     loose(m)
-                if themed(kind, m) is not None:
-                    raise LogError(f"{m!r} is already in theme {themed(kind, m)!r}")
+        for kind, members in (("groups", gids), ("items", ns)):
+            for m in members:
+                leave(kind, m)
         themes[tid] = {"name": name, "groups": [], "items": [], "later": False, "confirmed": False}
         join(themes[tid], "groups", gids)
         join(themes[tid], "items", ns)

@@ -282,7 +282,6 @@ def test_changing_a_confirmed_theme_unconfirms_it(edit):
     (agent("confirm", theme="t1"), "only the owner confirms"),
     (agent("theme", theme="t1", name="x", items=[5]), "theme 't1' already exists"),
     (agent("theme", theme="t3", name="x"), "groups and items are both empty"),
-    (agent("theme", theme="t3", name="x", items=[6]), "6 is already in theme 't1'"),
     (agent("theme", theme="t3", name="x", groups=["g9"]), "no group 'g9'"),
     (agent("theme", theme="t3", name="x", items=[1]), "item 1 is in group 'g1'; a theme takes the group"),
     (agent("assign", item=1, theme="t1"), "item 1 is in group 'g1'"),
@@ -375,6 +374,15 @@ def test_drop_on_a_theme_drops_every_item_in_it_and_one_undo_brings_them_back():
     for entry, message in ((owner("drop", theme="t9", reason="x"), "no theme 't9'"), (owner("drop", theme="t1", item=6, reason="x"), "takes one of")):
         with pytest.raises(LogError, match=message):
             replay(NS, THEMED + [entry])
+
+
+def test_a_new_theme_takes_its_members_from_the_themes_they_were_in():
+    state = replay(NS, THEMED + [owner("confirm", theme="t1"), owner("theme", theme="t3", name="stamps", items=[6])])
+    assert state["themes"]["t3"]["items"] == [6] and state["themes"]["t1"]["items"] == []
+    assert state["themes"]["t1"]["confirmed"] is False  # it lost a member
+    state = replay(NS, THEMED + [owner("theme", theme="t3", name="all of it", groups=["g2"], items=[5])])
+    assert set(state["themes"]) == {"t1", "t3"}  # t2 lost its last member and is gone
+    assert replay(NS, THEMED + [owner("theme", theme="t3", name="stamps", items=[6]), owner("undo")])["themes"]["t1"]["items"] == [6]
 
 
 def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
