@@ -73,7 +73,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
 let S = null, current = null, justSplit = [], hints = { items: {}, groups: {} };
-const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new";
+const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new", NEARBY = 5;
 const $ = (s) => document.querySelector(s);
 
 function el(tag, props = {}, ...kids) {
@@ -181,6 +181,7 @@ function itemRow(it, inGroup) {
     if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }), null, { items: [it.n] })));
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
+    acts.append(btn("Nearby", () => nearby(it)));
     if (!inGroup && !themeLater(it.theme)) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
     acts.append(btn("Drop", () => { const reason = prompt("Why drop it?"); if (reason) send({ op: "drop", item: it.n, reason }); }));
   }
@@ -321,16 +322,29 @@ async function similar(it) {
   const r = await fetch("/api/neighbours?item=" + encodeURIComponent(it.n));
   const j = await r.json();
   if (!r.ok) { $("#dlg").close(); return toast(j.error); }
-  const rows = j.nearest_outside.map((nb) => {
-    const acts = el("div", { class: "acts" });
-    const inGroup = nb.where in S.groups;
-    if (inGroup) acts.append(btn("Same group", () => { $("#dlg").close(); send({ op: "move", item: it.n, group: nb.where }); }, "main"));
-    if (nb.theme && it.where !== nb.where && !(it.where in S.groups))
-      acts.append(btn("Same theme", () => { $("#dlg").close(); send({ op: "assign", item: it.n, theme: nb.theme }); }));
-    return el("div", { class: "row" }, el("span", { class: "n" }, "#" + nb.n),
-      el("span", { class: "tx" }, nb.text, badge(nb.where), badge(themeName(nb.theme))), acts);
-  });
-  openDialog(el("b", {}, "Similar to #" + it.n), el("div", { class: "hint" }, it.text), ...rows,
+  openDialog(el("b", {}, "Similar to #" + it.n), el("div", { class: "hint" }, it.text), ...j.nearest_outside.map((nb) => neighbourRow(it, nb)),
+    el("div", { class: "bar" }, btn("Close", () => $("#dlg").close())));
+}
+
+function neighbourRow(it, nb) {
+  const acts = el("div", { class: "acts" });
+  if (nb.where in S.groups && nb.where !== it.where)
+    acts.append(btn("Same group", () => { $("#dlg").close(); send({ op: "move", item: it.n, group: nb.where }); }, "main"));
+  if (nb.theme && nb.theme !== it.theme && it.where !== nb.where && !(it.where in S.groups))
+    acts.append(btn("Same theme", () => { $("#dlg").close(); send({ op: "assign", item: it.n, theme: nb.theme }); }));
+  return el("div", { class: "row" }, el("span", { class: "n" }, "#" + nb.n),
+    el("span", { class: "tx" }, nb.text, badge(nb.where), badge(themeName(nb.theme))), acts);
+}
+
+// The list is in the order it was written, so the entries just above and below an item were written around the same time.
+function nearby(it) {
+  const place = (n) => String(n).split(".").map(Number);
+  const inOrder = (a, b) => { const x = place(a.n), y = place(b.n); for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+  const all = items().sort(inOrder), at = all.indexOf(it);
+  openDialog(el("b", {}, "Nearby in the list: #" + it.n),
+    el("div", { class: "hint" }, "Written just before (older)"), ...all.slice(Math.max(0, at - NEARBY), at).map((nb) => neighbourRow(it, nb)),
+    el("div", { class: "row" }, el("span", { class: "n" }, "#" + it.n), el("span", { class: "tx" }, el("b", {}, it.text))),
+    el("div", { class: "hint" }, "Written just after (newer)"), ...all.slice(at + 1, at + 1 + NEARBY).map((nb) => neighbourRow(it, nb)),
     el("div", { class: "bar" }, btn("Close", () => $("#dlg").close())));
 }
 
