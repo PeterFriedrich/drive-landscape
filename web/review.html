@@ -72,7 +72,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 <script>
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
-let S = null, current = null, justSplit = [];
+let S = null, current = null, justSplit = [], hints = { items: {}, groups: {} };
 const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new";
 const $ = (s) => document.querySelector(s);
 
@@ -103,6 +103,22 @@ async function load() {
   if (!r.ok) return toast(j.error);
   S = j;
   render();
+  if (S.counts.in_no_theme) suggest();
+}
+
+// Asked for after the page is drawn: the first answer after a split embeds the new parts, which takes a moment.
+async function suggest() {
+  const r = await fetch("/api/suggest");
+  if (!r.ok) return;
+  hints = await r.json();
+  renderMain();
+}
+
+function hintBar(kind, id) {
+  const tids = (hints[kind][id] || []).filter((tid) => S.themes.some((t) => t.id === tid));
+  if (!tids.length) return null;
+  return el("div", { class: "bar" }, el("span", { class: "badge" }, "nearest themes"),
+    ...tids.map((tid) => btn("→ " + themeName(tid).slice(0, 40), () => send({ op: "assign", [kind === "items" ? "item" : "group"]: kind === "items" ? S.items[id].n : id, theme: tid }))));
 }
 
 async function send(entry) {
@@ -175,7 +191,8 @@ function itemRow(it, inGroup) {
       it.where === "kept" ? badge(it.confirmed ? "kept ✓" : "kept", "ok") : null,
       later ? badge("later") : null,
       it.where === "dropped" ? badge(it.reason, "warn") : null,
-      it.draft ? el("span", { class: "was" }, "was: " + it.text) : null),
+      it.draft ? el("span", { class: "was" }, "was: " + it.text) : null,
+      !inGroup && it.theme === null && alone(it) ? hintBar("items", String(it.n)) : null),
     acts);
 }
 
@@ -189,7 +206,7 @@ function groupCard(gid) {
     btn("Rename", () => { const name = prompt("Group name:", g.name); if (name) send({ op: "rename", group: gid, name }); }),
     btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }), null, { groups: [gid] })),
     themeLater(g.theme) ? null : btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
-  return el("div", { class: "card" + (g.confirmed ? " done" : "") + (later ? " later" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
+  return el("div", { class: "card" + (g.confirmed ? " done" : "") + (later ? " later" : "") }, head, bar, g.theme === null ? hintBar("groups", gid) : null, ...groupItems(gid).map((it) => itemRow(it, true)));
 }
 
 function renderMain() {

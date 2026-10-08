@@ -223,6 +223,7 @@ session never has to read a whole document into its context.
 | `show <id> <group, theme or item>` | its items in age order, with their nearest outside neighbours; for one item that has several sentences, the sentence-by-sentence split |
 | `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
 | `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `later`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
+| `suggest <id>` | for each group and lone item in no theme, up to three themes: those of its nearest themed items, nearest first. Logs nothing |
 | `export <id> [--draft]` | write `distilled.md`: confirmed groups and kept items by theme, what each line replaces, what was dropped; report what is still open. `--draft` adds unconfirmed groups, marked |
 
 Built so far (`python -m src.distill`): `status`, `propose`, `groups`,
@@ -261,7 +262,9 @@ new one named on the spot, also per group), group, similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
 per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:
-**Later** for the whole theme, which asks first when the theme holds undecided items,
+A group or lone item in no theme shows up to three **nearest themes** as one-click
+buttons (`suggest`: the themes of its nearest items that have one, none when the
+nearest is farther than the theme cut); this is how split parts find a home. **Later** for the whole theme, which asks first when the theme holds undecided items,
 since they will be kept, and moves the theme below the others in the theme list; **Drop theme**, which drops every item in the theme (those
 inside its groups too) for one reason, as one log line that one Undo reverses. Undo. Keys: `j` / `k`
 between themes, `u` undo, `/` filter. Every decision is written to the log

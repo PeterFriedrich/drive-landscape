@@ -5,6 +5,7 @@
     python -m src.distill groups  todo-001 [--unreviewed] [--limit N] [--offset N]
     python -m src.distill themes  todo-001 [--limit N] [--offset N]
     python -m src.distill show    todo-001 g12        (or a theme: t3, an item: 412, a part: 412.1)
+    python -m src.distill suggest todo-001            (themes for what is in no theme)
     python -m src.distill break   todo-001 412 --who owner "first todo" "second todo"
     python -m src.distill export  todo-001 [--draft]
 
@@ -46,6 +47,7 @@ from src.embed import embed_items, fastembed_fn, read_items
 ROOT = Path("data/raw/private/todo")
 TEXT_CHARS = 160
 NEIGHBOURS = 5
+SUGGESTIONS = 3
 
 
 class DistillError(Exception):
@@ -280,6 +282,39 @@ def show(doc: Path, args) -> dict:
     }
 
 
+def suggest(doc: Path, args) -> dict:
+    """For each group and lone item in no theme: the themes of the nearest items that have one, nearest first.
+
+    Only a hint for the owner; nothing is logged. A neighbour farther than the
+    theme cut suggests nothing, so a member can be missing from the answer.
+    """
+    st, _ = state.load(doc)
+    originals = read_items(doc / "items.jsonl")
+    row = {n: i for i, n in enumerate([it["n"] for it in originals] + list(st["parts"]))}
+    theme_of_row = {row[n]: tid for tid, t in st["themes"].items() for n in _theme_items(st, t)}
+    themed_items = {n for t in st["themes"].values() for n in t["items"]}
+    themed_groups = {gid for t in st["themes"].values() for gid in t["groups"]}
+    loose = {"items": {n: [n] for n in [*st["undecided"], *st["kept"]] if n not in themed_items},
+             "groups": {gid: g["items"] for gid, g in st["groups"].items() if gid not in themed_groups}}
+    out: dict = {"items": {}, "groups": {}}
+    if not theme_of_row or not (loose["items"] or loose["groups"]):
+        return out
+    distance = _distance(doc, originals, st["parts"])
+    themed = np.array(sorted(theme_of_row))
+    for kind, members in loose.items():
+        for member, ns in members.items():
+            nearest = distance[[row[n] for n in ns]][:, themed].min(axis=0)
+            found: list = []
+            for i in np.argsort(nearest):
+                if nearest[i] > grouping.THEME_CUT or len(found) == SUGGESTIONS:
+                    break
+                if theme_of_row[themed[i]] not in found:
+                    found.append(theme_of_row[themed[i]])
+            if found:
+                out[kind][str(member)] = found
+    return out
+
+
 def break_item(doc: Path, args) -> dict:
     n = _item_id(args.item)
     state.append(doc, {"who": args.who, "op": "break", "item": n, "parts": args.parts})
@@ -396,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
         for arg in spec.split():
             p.add_argument(arg.rstrip("+"), **({"nargs": "+"} if arg.endswith("+") else {}))
         p.add_argument("--who", default="agent", choices=("agent", "owner"))
-    for fn in (status, propose, groups, themes, show, break_item, export):
+    for fn in (status, propose, groups, themes, show, suggest, break_item, export):
         p = sub.add_parser(fn.__name__.removesuffix("_item"))
         p.set_defaults(fn=fn)
         p.add_argument("id", help="document id, e.g. todo-001")
