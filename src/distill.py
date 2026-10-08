@@ -48,6 +48,8 @@ ROOT = Path("data/raw/private/todo")
 TEXT_CHARS = 160
 NEIGHBOURS = 5
 SUGGESTIONS = 3
+# Looser than the theme cut: what is in no theme is what did not cluster at that cut.
+NEW_THEME_CUT = 0.75
 
 
 class DistillError(Exception):
@@ -287,6 +289,8 @@ def suggest(doc: Path, args) -> dict:
 
     Only a hint for the owner; nothing is logged. A neighbour farther than the
     theme cut suggests nothing, so a member can be missing from the answer.
+    "new" is the themes those members could form among themselves: the clusters of
+    two or more at NEW_THEME_CUT, each named after its most central member.
     """
     st, _ = state.load(doc)
     originals = read_items(doc / "items.jsonl")
@@ -296,13 +300,13 @@ def suggest(doc: Path, args) -> dict:
     themed_groups = {gid for t in st["themes"].values() for gid in t["groups"]}
     loose = {"items": {n: [n] for n in [*st["undecided"], *st["kept"]] if n not in themed_items},
              "groups": {gid: g["items"] for gid, g in st["groups"].items() if gid not in themed_groups}}
-    out: dict = {"items": {}, "groups": {}}
-    if not theme_of_row or not (loose["items"] or loose["groups"]):
+    out: dict = {"items": {}, "groups": {}, "new": []}
+    if not (loose["items"] or loose["groups"]):
         return out
     distance = _distance(doc, originals, st["parts"])
     themed = np.array(sorted(theme_of_row))
     for kind, members in loose.items():
-        for member, ns in members.items():
+        for member, ns in members.items() if theme_of_row else ():
             nearest = distance[[row[n] for n in ns]][:, themed].min(axis=0)
             found: list = []
             for i in np.argsort(nearest):
@@ -312,6 +316,16 @@ def suggest(doc: Path, args) -> dict:
                     found.append(theme_of_row[themed[i]])
             if found:
                 out[kind][str(member)] = found
+    flat = [(kind, member, [row[n] for n in ns]) for kind, members in loose.items() for member, ns in members.items()]
+    between = np.zeros((len(flat), len(flat)))
+    for i, (_, _, a) in enumerate(flat):
+        for j in range(i + 1, len(flat)):
+            between[i, j] = between[j, i] = distance[np.ix_(a, flat[j][2])].mean()
+    for rows in grouping.members(grouping.two_level(between, NEW_THEME_CUT, NEW_THEME_CUT)[1]):
+        central = flat[grouping.medoid(between, rows)]
+        out["new"].append({"items": [flat[i][1] for i in rows if flat[i][0] == "items"],
+                           "groups": [flat[i][1] for i in rows if flat[i][0] == "groups"],
+                           "named_after": central[1]})
     return out
 
 

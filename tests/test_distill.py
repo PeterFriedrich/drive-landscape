@@ -124,14 +124,18 @@ def test_show_gives_the_items_and_their_nearest_outside_neighbours(root, capsys)
 
 def test_suggest_points_what_is_in_no_theme_at_the_themes_of_its_nearest_items(root, capsys):
     run(root, capsys, "propose", "doc-1")
-    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {}, "groups": {}}  # 6 is close to nothing
+    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {}, "groups": {}, "new": []}  # 6 is close to nothing
     run(root, capsys, "assign", "doc-1", "3", "none")
     before = len(state.read_log(root / "doc-1" / "work" / "log.jsonl"))
-    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {"3": ["t1"]}, "groups": {}}
+    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {"3": ["t1"]}, "groups": {}, "new": []}
     run(root, capsys, "assign", "doc-1", "3", "t1")
     run(root, capsys, "assign", "doc-1", "g1", "none")
-    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {}, "groups": {"g1": ["t1"]}}
-    assert len(state.read_log(root / "doc-1" / "work" / "log.jsonl")) == before + 2  # suggest logs nothing
+    assert run(root, capsys, "suggest", "doc-1")[1] == {"items": {}, "groups": {"g1": ["t1"]}, "new": []}
+    run(root, capsys, "assign", "doc-1", "4", "none")
+    run(root, capsys, "assign", "doc-1", "5", "none")  # t2 is gone; 4 and 5 could be a theme again, 6 joins nothing
+    new = run(root, capsys, "suggest", "doc-1")[1]["new"]
+    assert len(new) == 1 and (new[0]["items"], new[0]["groups"]) == ([4, 5], []) and new[0]["named_after"] in (4, 5)
+    assert len(state.read_log(root / "doc-1" / "work" / "log.jsonl")) == before + 4  # suggest logs nothing
 
 
 def test_long_text_is_cut(root, capsys):
