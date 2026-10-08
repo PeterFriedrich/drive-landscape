@@ -73,7 +73,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
 let S = null, current = null, justSplit = [];
-const NONE = "", DROPPED = "~dropped", LATER = "~later";
+const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new";
 const $ = (s) => document.querySelector(s);
 
 function el(tag, props = {}, ...kids) {
@@ -162,7 +162,7 @@ function itemRow(it, inGroup) {
       acts.append(btn("Unkeep", () => send({ op: "unassign", item: it.n })));
     } else acts.append(btn("Keep", () => send({ op: "keep", item: it.n })));
     if (!inGroup) acts.append(btn("Edit line", () => { const text = prompt("The line in the new list:", it.draft || it.text); if (text && text !== (it.draft || it.text)) send({ op: "draft", item: it.n, text }); }));
-    if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }))));
+    if (!inGroup) acts.append(btn("Theme…", () => pickTheme("Put this item in which theme?", (tid) => send({ op: "assign", item: it.n, theme: tid }), null, { items: [it.n] })));
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
     if (!inGroup && !themeLater(it.theme)) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
@@ -187,7 +187,7 @@ function groupCard(gid) {
     g.confirmed ? null : btn("Confirm group", () => send({ op: "confirm", group: gid }), "main"),
     btn("Edit line", () => { const text = prompt("The line in the new list:", g.draft || g.name); if (text) send({ op: "draft", group: gid, text }); }),
     btn("Rename", () => { const name = prompt("Group name:", g.name); if (name) send({ op: "rename", group: gid, name }); }),
-    btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }))),
+    btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }), null, { groups: [gid] })),
     themeLater(g.theme) ? null : btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
   return el("div", { class: "card" + (g.confirmed ? " done" : "") + (later ? " later" : "") }, head, bar, ...groupItems(gid).map((it) => itemRow(it, true)));
 }
@@ -275,11 +275,16 @@ function picker(title, options, choose) {
   input.focus();
 }
 
-function pickTheme(title, choose, except) {
+function pickTheme(title, choose, except, member) {
   const options = S.themes.filter((t) => t.id !== except).map((t) => ({ id: t.id, label: t.name, note: `${t.id} · ${themeSize(t)}` }))
     .sort((a, b) => a.label.localeCompare(b.label));
   if (!except) options.unshift({ id: null, label: "(no theme)", note: "" });
-  picker(title, options, choose);
+  if (member) options.unshift({ id: NEW, label: "(a new theme…)", note: "" });
+  picker(title, options, (tid) => {
+    if (tid !== NEW) return choose(tid);
+    const name = prompt("Name for the new theme:");
+    if (name) send({ op: "theme", name, groups: [], items: [], ...member });
+  });
 }
 
 function pickGroup(it) {

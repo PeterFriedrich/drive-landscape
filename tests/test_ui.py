@@ -73,6 +73,9 @@ def test_an_action_is_one_log_line_signed_owner(site):
     snap = json.loads(call(url + "/api/state")[1])
     assert (snap["items"]["6.2"]["later"], snap["items"]["6.2"]["where"], snap["items"]["6.2"]["theme"]) == (True, "kept", "t1")
     assert snap["groups"]["g2"]["later"] is True and snap["groups"]["g2"]["confirmed"] is True and snap["counts"]["later"] == 2
+    code, body = call(url + "/api/log", {"op": "theme", "name": "music", "groups": [], "items": ["6.2"]})  # as the page's "(a new theme…)" sends it
+    new = json.loads(body)["logged"]["theme"]
+    assert code == 200 and json.loads(call(url + "/api/state")[1])["items"]["6.2"]["theme"] == new != "t1"
 
 
 def test_a_decision_that_makes_no_sense_is_refused_and_not_written(site):

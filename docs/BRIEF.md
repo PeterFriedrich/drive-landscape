@@ -47,6 +47,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - **2026-10-06** — A single item can be reworded: `draft` takes an item as well as a group, and the wording is the item's line on the new list while its original text stays in `items.jsonl` and in the appendix. … Rejected: using split for it (split needs two or more parts) and a group of one as the way to reword.
 - **2026-10-07** — A whole theme can be dropped: `drop` takes a theme as well as an item, and drops every item in it, those inside its groups too, for one reason, in one log line (one Undo brings them all back, with …
 - **2026-10-07** — The top of the list is the oldest entry; entries get newer going down and on later pages (the owner, about the original document).
+- **2026-10-08** — A new theme takes its members from whichever themes they were in (`theme` no longer refuses a member that is already in a theme), so the page can start a theme from one item or group in one log line …
 
 ## Open work
 
