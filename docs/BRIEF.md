@@ -49,6 +49,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - **2026-10-07** — The top of the list is the oldest entry; entries get newer going down and on later pages (the owner, about the original document).
 - **2026-10-08** — A new theme takes its members from whichever themes they were in (`theme` no longer refuses a member that is already in a theme), so the page can start a theme from one item or group in one log line …
 - **2026-10-08** — What is in no theme (split parts above all) gets theme suggestions, not automatic placement: up to three themes, taken from its nearest items that have a theme, shown as one-click buttons; nothing is … Rejected: bulk placement signed "proposal" (one log line per member, each its own Undo, and it unconfirms the themes it adds to).
+- **2026-10-08** — New themes are proposed for what is in no theme as candidates the owner accepts one at a time ("Make theme"), never logged by the proposal: average-linkage clusters of two or more among those members … Rejected: re-running `propose` (it would orphan the decisions made) and a cut of 0.80 or more.
 
 ## Open work
 

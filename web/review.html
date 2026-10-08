@@ -72,7 +72,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 <script>
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
-let S = null, current = null, justSplit = [], hints = { items: {}, groups: {} };
+let S = null, current = null, justSplit = [], hints = { items: {}, groups: {}, new: [] };
 const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new", NEARBY = 5;
 const $ = (s) => document.querySelector(s);
 
@@ -197,6 +197,19 @@ function itemRow(it, inGroup) {
     acts);
 }
 
+// A theme the server thinks some of what is in no theme could form; shown only while two or more of its members still are.
+function candidateCard(c) {
+  const ns = c.items.filter((n) => S.items[String(n)] && alone(S.items[String(n)]) && S.items[String(n)].theme === null);
+  const gids = c.groups.filter((gid) => S.groups[gid] && S.groups[gid].theme === null);
+  if (ns.length + gids.length < 2) return null;
+  const label = (m) => m in S.groups ? S.groups[m].draft || S.groups[m].name : S.items[String(m)].text;
+  const first = [c.named_after, ...gids, ...ns].find((m) => gids.includes(m) || ns.includes(m));
+  return el("div", { class: "card" },
+    el("div", { class: "bar" }, btn("Make theme", () => { const name = prompt("Name for the new theme:", label(first).slice(0, 80)); if (name) send({ op: "theme", name, groups: gids, items: ns }); }, "main")),
+    ...gids.map((gid) => el("div", { class: "row" }, el("span", { class: "n" }, gid), el("span", { class: "tx" }, label(gid), badge(S.groups[gid].items.length + " items")))),
+    ...ns.map((n) => el("div", { class: "row" }, el("span", { class: "n" }, "#" + n), el("span", { class: "tx" }, label(n)))));
+}
+
 function groupCard(gid) {
   const g = S.groups[gid], later = g.later || themeLater(g.theme);
   const head = el("div", { class: "head" }, el("b", {}, g.draft || g.name), badge(gid),
@@ -231,7 +244,10 @@ function renderMain() {
   } else if (current === NONE) {
     const groups = Object.keys(S.groups).filter((gid) => S.groups[gid].theme === null);
     const loose = items().filter((it) => alone(it) && it.theme === null);
-    out.push(el("h2", {}, "In no theme"), ...groups.map(groupCard));
+    out.push(el("h2", {}, "In no theme"));
+    const candidates = hints.new.map(candidateCard).filter((c) => c);
+    if (candidates.length) out.push(el("h3", {}, `Could be new themes (${candidates.length})`), ...candidates);
+    out.push(...groups.map(groupCard));
     if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
   } else {
     const t = S.themes.find((t) => t.id === current);

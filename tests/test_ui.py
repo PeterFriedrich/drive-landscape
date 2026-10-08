@@ -103,7 +103,7 @@ def test_neighbours_of_an_item(site):
     assert out["nearest_outside"][0]["where"] == "g1" and out["nearest_outside"][0]["theme"] == "t1"
     assert call(url + "/api/neighbours?item=99")[0] == 400
     assert call(url + "/api/log", {"op": "assign", "item": 3, "theme": None})[0] == 200
-    assert json.loads(call(url + "/api/suggest")[1]) == {"items": {"3": ["t1"]}, "groups": {}}
+    assert json.loads(call(url + "/api/suggest")[1]) == {"items": {"3": ["t1"]}, "groups": {}, "new": []}
 
 
 def test_save_commits_the_log_and_pushes_it_and_nothing_else_does(site, tmp_path_factory):
