@@ -10,6 +10,7 @@ the page then reads the state again. Nothing here holds state of its own.
     GET  /api/state             counts, themes, groups and items as they stand
     GET  /api/neighbours?item=N the item's nearest neighbours (src.distill show)
     GET  /api/suggest           themes for the groups and lone items in no theme (src.distill suggest)
+    GET  /api/preview           the new list as it stands, groups not yet confirmed included (src.distill distilled)
     POST /api/log               one log entry without "who"; new groups and themes get an id
     POST /api/save              commit the log in the repository that holds the document, and push it
 
@@ -144,6 +145,8 @@ def handler(doc: Path) -> type[BaseHTTPRequestHandler]:
                 self.answer(lambda: snapshot(doc))
             elif url.path == "/api/suggest":
                 self.answer(lambda: distill.suggest(doc, None))
+            elif url.path == "/api/preview":
+                self.answer(lambda: dict(zip(("text", "summary"), distill.distilled(doc, draft=True))))
             elif url.path == "/api/neighbours":
                 item = parse_qs(url.query).get("item", [""])[0]
                 self.answer(lambda: distill.show(doc, argparse.Namespace(group=item, limit=1)))
