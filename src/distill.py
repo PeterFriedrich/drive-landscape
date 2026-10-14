@@ -27,8 +27,9 @@ signed "proposal". From then on groups and themes are read from the log.
 
 `break` is the owner's: it splits an item that holds several todos into one
 item per text (src/state.py refuses it from anyone else). `show` on an unbroken
-item gives its sentence-by-sentence split as a starting point. Parts are
-embedded the first time a command needs them, into <doc>/work/part_vectors.npz.
+item gives its sentence-by-sentence split as a starting point. Parts, and the
+lines the owner has reworded, are embedded the first time a command needs them,
+into <doc>/work/part_vectors.npz.
 
 Output carries item text, which is private — see data/DATA.md.
 """
@@ -108,19 +109,27 @@ def _part_vectors(doc: Path, texts: list[str], dimensions: int) -> np.ndarray:
 _distance_cache: tuple = (None, None)
 
 
-def _distance(doc: Path, originals: list[dict], parts: dict) -> np.ndarray:
+def _distance(doc: Path, originals: list[dict], st: dict) -> np.ndarray:
     """Distances between every two items, the originals first and then the parts. Read-only.
+
+    A kept item the owner has reworded is matched on its new line, not its old text.
 
     The review server asks for the same matrix on every click, so the latest one is kept
     until the vectors, an item's text or the parts change.
     """
     global _distance_cache
     vectors = _vectors(doc, originals)
-    texts = [it["text"] for it in originals] + list(parts.values())
+    parts = st["parts"]
+    drafts = {n: k["draft"] for n, k in st["kept"].items() if k["draft"]}
+    ns = [it["n"] for it in originals] + list(parts)
+    texts = [drafts.get(n, t) for n, t in zip(ns, [it["text"] for it in originals] + list(parts.values()))]
     key = (str(doc), (doc / "work" / "vectors.npy").stat().st_mtime_ns, tuple(texts))
     if _distance_cache[0] != key:
         if parts:
             vectors = np.vstack([vectors, _part_vectors(doc, list(parts.values()), vectors.shape[1])])
+        if drafts:
+            vectors = vectors.copy()
+            vectors[[ns.index(n) for n in drafts]] = _part_vectors(doc, list(drafts.values()), vectors.shape[1])
         matrix = grouping.combined_distance(vectors, texts)
         matrix.flags.writeable = False
         _distance_cache = (key, matrix)
@@ -263,7 +272,7 @@ def show(doc: Path, args) -> dict:
     where = _where(st)
     theme_of = {n: tid for tid, t in st["themes"].items() for n in _theme_items(st, t)}
     row = {it["n"]: i for i, it in enumerate(items)}
-    distance = _distance(doc, originals, st["parts"])
+    distance = _distance(doc, originals, st)
     inside_rows = [row[n] for n in inside]
     nearest = distance[inside_rows].min(axis=0)
     # A broken item is no longer an item; its parts stand in for it as neighbours.
@@ -303,7 +312,7 @@ def suggest(doc: Path, args) -> dict:
     out: dict = {"items": {}, "groups": {}, "new": []}
     if not (loose["items"] or loose["groups"]):
         return out
-    distance = _distance(doc, originals, st["parts"])
+    distance = _distance(doc, originals, st)
     themed = np.array(sorted(theme_of_row))
     for kind, members in loose.items():
         for member, ns in members.items() if theme_of_row else ():
