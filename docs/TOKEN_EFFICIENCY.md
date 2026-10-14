@@ -60,6 +60,22 @@ prints it) before optimizing anything else.
   grep it rather than reading it whole.
 - <add the project's own large files here as they appear>
 
+## Disk
+
+Projects on one host share one disk. On the owner's free-tier server that is
+36 GB. On 2026-10-14 it reached 95%, mostly from build intermediates (tiles,
+venvs, downloads) that ended sessions had left in their scratchpads, about
+2.2 GB from one project. A scratchpad is not cleaned when its session ends.
+
+- **Intermediates go in one work folder** in the session's scratchpad, never
+  scattered, so one `rm -rf` clears them.
+- **Before a build that writes more than ~500 MB, check `df -h /`.** If the
+  build would leave under ~2 GB free, stop and tell the owner instead of
+  filling the disk.
+- **When the build finishes, delete its intermediates.** Anything worth keeping
+  moves to the repo's git-ignored `data/` or `output/` area, where it is
+  visible and owned. Don't leave it in scratch.
+
 ## Going forward
 
 When you learn a new efficiency lesson (a file that shouldn't be read raw, a
