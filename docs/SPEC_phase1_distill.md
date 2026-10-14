@@ -290,7 +290,10 @@ on its own. The mark does not unconfirm anything. A kept item can be given its
 own line (`draft <id> <item> <text>`, "Edit line" on the page), as a group can:
 the new list shows that wording and the appendix still shows the old text.
 Rewording an undecided item keeps it, and rewording a confirmed one unconfirms
-it. Marking a theme later is one
+it. A reworded item is matched on its new line from then on (similar, the
+nearest-theme suggestions, the candidate new themes), so rewording a cryptic
+entry also makes it easier to place; the line is embedded on first use, as a
+split part is. Marking a theme later is one
 log line: every line of the theme goes to the "Later" section and the theme's
 undecided items are kept. The mark stays with the theme, so what joins it
 afterwards is later too and what leaves it is not. Re-running

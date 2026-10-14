@@ -181,6 +181,18 @@ def test_distances_are_worked_out_once_until_the_parts_or_the_vectors_change(roo
     assert built == [6, 8, 8]
 
 
+def test_a_reworded_item_is_matched_on_its_new_line(root, capsys, embedded):
+    run(root, capsys, "propose", "doc-1")
+    assert run(root, capsys, "show", "doc-1", "6")[1]["nearest_outside"][0]["distance"] > 0.9  # close to nothing
+    assert run(root, capsys, "suggest", "doc-1")[1]["items"] == {}
+    run(root, capsys, "draft", "doc-1", "6", "oil the gate hinge again")
+    nearest = run(root, capsys, "show", "doc-1", "6")[1]["nearest_outside"][0]
+    assert nearest["n"] in (1, 2) and nearest["distance"] < 0.5
+    assert run(root, capsys, "suggest", "doc-1")[1]["items"] == {"6": ["t1"]}
+    run(root, capsys, "unassign", "doc-1", "6")  # the line goes with the keep, and so does the match
+    assert run(root, capsys, "show", "doc-1", "6")[1]["nearest_outside"][0]["distance"] > 0.9
+
+
 @pytest.fixture
 def embedded(root, monkeypatch):
     """Parts embed with a made-up function: the gate direction, or the library one."""
