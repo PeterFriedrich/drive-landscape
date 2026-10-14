@@ -273,8 +273,9 @@ inside its groups too) for one reason, as one log line that one Undo reverses. U
 between themes, `u` undo, `/` filter. Every decision is written to the log
 file at once; **Save** (`POST /api/save`) commits the log in the repository
 that holds the document and pushes it, and is the only thing that does: the
-button is filled while the log holds decisions the remote lacks. Not built: the flagged-first queue, the
-preview of the new list, why items were put together, the sections view.
+button is filled while the log holds decisions the remote lacks. **Preview** (`GET /api/preview`) shows
+the new list as it stands, the text `export --draft` would write (groups not yet confirmed included and
+marked), and writes nothing. Not built: the flagged-first queue, why items were put together, the sections view.
 Requests whose `Host` is not `127.0.0.1` / `localhost` are refused, and the
 write route takes JSON only, so another site open in the browser cannot write
 to the log.

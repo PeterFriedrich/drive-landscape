@@ -51,6 +51,7 @@ dialog textarea { min-height:190px; }
 dialog .opts { max-height:50vh; overflow:auto; margin-top:8px; }
 dialog .opt { padding:6px 8px; cursor:pointer; border-radius:6px; display:flex; gap:8px; }
 dialog .opt:hover, dialog .opt.on { background:var(--hover); }
+dialog pre { max-height:65vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; margin:8px 0; }
 dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--warn); color:#fff; padding:8px 14px; border-radius:8px; display:none; max-width:80vw; }
 </style>
@@ -59,6 +60,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 <header>
   <b id="doc"></b>
   <span id="counts"></span>
+  <button id="preview" title="The new list as it stands, groups not yet confirmed included">Preview</button>
   <button id="undo" title="Take back the latest decision (u)">Undo</button>
   <button id="save" title="Commit your decisions to the private repository and push them"></button>
 </header>
@@ -364,8 +366,20 @@ function nearby(it) {
     el("div", { class: "bar" }, btn("Close", () => $("#dlg").close())));
 }
 
+async function preview() {
+  openDialog(el("b", {}, "The new list as it stands"), el("div", { class: "hint" }, "Building…"));
+  const r = await fetch("/api/preview");
+  const j = await r.json();
+  if (!r.ok) { $("#dlg").close(); return toast(j.error); }
+  const c = j.summary;
+  openDialog(el("b", {}, "The new list as it stands"),
+    el("div", { class: "hint" }, `${c.lines} lines in ${c.sections} sections · ${c.later} later · ${c.undecided} items undecided · ${c.groups_not_confirmed} groups not confirmed (shown, marked)`),
+    el("pre", {}, j.text), el("div", { class: "bar" }, btn("Close", () => $("#dlg").close())));
+}
+
 const undo = () => send({ op: "undo" }).then((ok) => ok && toast("Took back the latest decision."));
 $("#undo").addEventListener("click", undo);
+$("#preview").addEventListener("click", preview);
 $("#save").addEventListener("click", async () => {
   $("#save").disabled = true;
   $("#save").textContent = "Saving…";

@@ -106,6 +106,17 @@ def test_neighbours_of_an_item(site):
     assert json.loads(call(url + "/api/suggest")[1]) == {"items": {"3": ["t1"]}, "groups": {}, "new": []}
 
 
+def test_preview_is_the_export_text_and_writes_nothing(site):
+    doc, url = site
+    assert call(url + "/api/log", {"op": "keep", "item": 3})[0] == 200
+    before = state.read_log(doc / "work" / "log.jsonl")
+    code, body = call(url + "/api/preview")
+    out = json.loads(body)
+    assert code == 200 and out["text"] == distill.distilled(doc, draft=True)[0]
+    assert out["summary"]["lines"] == 2 and "(not confirmed) [" in out["text"] and f"- {TEXTS[2]} [" in out["text"]
+    assert not (doc / "work" / "distilled.md").exists() and state.read_log(doc / "work" / "log.jsonl") == before
+
+
 def test_save_commits_the_log_and_pushes_it_and_nothing_else_does(site, tmp_path_factory):
     doc, url = site
     assert json.loads(call(url + "/api/state")[1])["unsaved"] is None  # not in a repository yet

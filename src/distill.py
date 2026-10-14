@@ -400,8 +400,8 @@ def edit(doc: Path, args) -> dict:
     return {"logged": state.append(doc, {"who": args.who, "op": args.command, **EDITS[args.command][1](doc, args)})}
 
 
-def export(doc: Path, args) -> dict:
-    """Write <doc>/work/distilled.md from the log: themes as sections, then what each line replaces."""
+def distilled(doc: Path, draft: bool) -> tuple[str, dict]:
+    """The new list from the log: themes as sections, then what each line replaces. Writes nothing."""
     st, counts = state.load(doc)
     text = {**{it["n"]: it["text"] for it in read_items(doc / "items.jsonl")}, **st["parts"]}
     section_of = {("g", gid): tid for tid, t in st["themes"].items() for gid in t["groups"]}
@@ -417,7 +417,7 @@ def export(doc: Path, args) -> dict:
             sections.setdefault(tid, []).append((ns, line))
 
     for gid, g in st["groups"].items():
-        if g["confirmed"] or args.draft:
+        if g["confirmed"] or draft:
             line = (g["draft"] or g["name"]) + ("" if g["confirmed"] else " (not confirmed)")
             place(("g", gid), g["later"], oldest_first(g["items"]), line)
     for n, k in st["kept"].items():
@@ -437,10 +437,16 @@ def export(doc: Path, args) -> dict:
     out += ["## Dropped", ""] + [f"- {n}: {text[n]} — {st['dropped'][n]}" for n in oldest_first(st["dropped"])] + [""]
     left = {"undecided": counts["undecided"], "groups_not_confirmed": counts["groups"] - counts["groups_confirmed"]}
     out += ["## Still open", "", f"- {left['undecided']} items undecided",
-            f"- {left['groups_not_confirmed']} groups not confirmed" + ("" if args.draft else " (left out; --draft includes them)"), ""]
+            f"- {left['groups_not_confirmed']} groups not confirmed" + ("" if draft else " (left out; --draft includes them)"), ""]
+    return "\n".join(out), {"lines": k, "sections": len(order), "later": len(later), "dropped": counts["dropped"], **left}
+
+
+def export(doc: Path, args) -> dict:
+    """Write <doc>/work/distilled.md."""
+    text, summary = distilled(doc, args.draft)
     path = doc / "work" / "distilled.md"
-    path.write_text("\n".join(out), encoding="utf-8")
-    return {"wrote": str(path), "lines": k, "sections": len(order), "later": len(later), "dropped": counts["dropped"], **left}
+    path.write_text(text, encoding="utf-8")
+    return {"wrote": str(path), **summary}
 
 
 def main(argv: list[str] | None = None) -> int:
