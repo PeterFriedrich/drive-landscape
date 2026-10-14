@@ -69,6 +69,11 @@ SUMMARIES = ROOT / "session-summary"
 # is the always-on nag this replaces.
 SUBSTANTIVE = ("src", "tests", "tools", "scripts", "web", ".github", "main.py")
 
+# Merged branches left on origin. With GitHub's delete-on-merge off they pile up
+# uncounted (edmonton-tax-viz found 225); the owner approves each prune and asked
+# to be told at 90. Ported from edmonton-tax-viz PR #727.
+BRANCH_REMINDER_AT = 90
+
 
 def _git(*args):
     """stdout, or None on any failure at all. See the module docstring."""
@@ -127,6 +132,27 @@ def gap():
     return {"handoff": handoff.name, "commits": commits, "dirty": dirty}
 
 
+def merged_branch_reminder():
+    # type: () -> Optional[str]
+    """A reminder when origin holds BRANCH_REMINDER_AT merged branches, else None.
+
+    Reads the remote-tracking refs as of the last fetch: a session-start hook
+    cannot wait on the network. So the count can run high after someone else
+    pruned, and the message says to re-count before acting on it."""
+    out = _git("branch", "-r", "--merged", "origin/master",
+               "--format=%(refname:short)")
+    if out is None:
+        return None
+    n = len([b for b in out.split("\n")
+             if b and b not in ("origin", "origin/HEAD", "origin/master")])
+    if n < BRANCH_REMINDER_AT:
+        return None
+    return (f"⚠️ {n} merged branches are sitting on origin (reminder threshold "
+            f"{BRANCH_REMINDER_AT}). Tell the owner and ask whether to prune them; "
+            f"run `git fetch --prune` and re-count first, and delete nothing "
+            f"without their go-ahead.")
+
+
 def message(g, at_start=False):
     bits = []
     if g["commits"]:
@@ -166,13 +192,16 @@ def main(argv=None):
 
     try:
         g = gap()
+        # Not at SessionEnd: a prune is not something to start on the way out.
+        branches = None if args.session_end else merged_branch_reminder()
     except Exception:  # noqa: BLE001 — belt and braces; a hook must never raise
         return 0
-    if g is None:
+    if g is None and branches is None:
         return 0  # nothing owed: say nothing, so the message means something
 
     if args.session_start:
-        text = message(g, at_start=True)
+        text = "\n\n".join(
+            t for t in (g and message(g, at_start=True), branches) if t)
         print(json.dumps({
             "systemMessage": text,
             "hookSpecificOutput": {
@@ -185,7 +214,7 @@ def main(argv=None):
         # shows stderr to the user. The hook must not redirect stderr away.
         sys.stderr.write(message(g) + "\n")
     else:
-        print(message(g))
+        print("\n\n".join(t for t in (g and message(g), branches) if t))
     return 0
 
 

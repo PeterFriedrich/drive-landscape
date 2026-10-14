@@ -72,7 +72,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 
 - `TODO.md` — living backlog and **the source of truth for progress**
 - `docs/DECISIONS.md` — append-only index of locked decisions: one row + pointer to the doc holding the full reasoning
-- `docs/TOKEN_EFFICIENCY.md` — context/token hygiene (what NOT to read raw, session-summary archiving)
+- `docs/TOKEN_EFFICIENCY.md` — context/token hygiene (what NOT to read raw, session-summary archiving) and disk use (scratch intermediates, `df -h /` before a big build)
 - `docs/DATA_ISSUES.md` — register of defects in data we DON'T control: evidence, what it breaks here, and **whether the publisher has been told**
 - `docs/AUDIT_LEDGER.md` — coverage map of executed audit runs
 - `data/DATA.md` — data source details, column names, known quirks
