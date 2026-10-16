@@ -29,6 +29,7 @@ Usually run on the owner's Linux work laptop (room to install anything, e.g. tor
 - copier==9.18.2
 - google-api-python-client==2.201.0
 - google-auth-oauthlib==1.5.0
+- google-auth==2.62.0
 - pdfplumber==0.11.10
 - fastembed==0.8.1
 - numpy==2.5.3

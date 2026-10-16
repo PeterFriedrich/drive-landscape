@@ -35,6 +35,7 @@ fi
 .venv/bin/python -m pytest tests/ -q
 .venv/bin/python scripts/check_doc_citations.py
 .venv/bin/python scripts/check_decisions_log.py
+.venv/bin/python scripts/check_requirements.py
 
 # Claude Code auto-memory is per project path. The feedback-type memories from
 # a sibling project (how the owner wants work done) are the most portable

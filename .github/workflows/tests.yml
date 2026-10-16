@@ -54,3 +54,8 @@ jobs:
       # supersedes an earlier one has that row marked in place.
       - name: Check decisions log
         run: python scripts/check_decisions_log.py
+
+      # Every third-party import is pinned in requirements.txt, so rebuilding
+      # the venv cannot silently drop a package installed by hand.
+      - name: Check requirements cover imports
+        run: python scripts/check_requirements.py
