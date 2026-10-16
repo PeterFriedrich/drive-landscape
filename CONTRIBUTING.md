@@ -31,7 +31,7 @@ This project uses Claude Code. The pipeline above is designed for it:
 ## Getting Started
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -r requirements.txt
+uv venv .venv && uv pip install -r requirements.txt   # or: python -m venv .venv && .venv/bin/pip install -r requirements.txt
 git config core.hooksPath .githooks   # NOT cloned automatically; see CLAUDE.md
 .venv/bin/python -m pytest tests/ -q  # synthetic data only — no downloads needed
 ```

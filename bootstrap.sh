@@ -15,10 +15,23 @@ if [ ! -x .venv/bin/python ]; then
     [ -n "$c" ] && command -v "$c" >/dev/null 2>&1 && { py="$c"; break; }
   done
   [ -n "$py" ] || { echo "no python >= 3.10 on PATH (set PYTHON=/path/to/python3.x)"; exit 1; }
-  "$py" -m venv .venv
+  # uv links packages from one shared cache, so a stack shared by several
+  # projects sits on disk once (docs/TOKEN_EFFICIENCY.md §Disk). The pinned
+  # interpreter stops uv downloading a Python of its own.
+  if command -v uv >/dev/null 2>&1; then
+    uv venv -q --python "$py" .venv
+  else
+    "$py" -m venv .venv
+  fi
 fi
 echo "venv: $(.venv/bin/python --version)"
-.venv/bin/pip install -q -r requirements.txt
+if command -v uv >/dev/null 2>&1; then
+  uv pip install -q --python .venv/bin/python -r requirements.txt
+else
+  # A venv uv made has no pip; give it one rather than fail on a machine without uv.
+  .venv/bin/python -m pip --version >/dev/null 2>&1 || .venv/bin/python -m ensurepip >/dev/null
+  .venv/bin/python -m pip install -q -r requirements.txt
+fi
 .venv/bin/python -m pytest tests/ -q
 .venv/bin/python scripts/check_doc_citations.py
 .venv/bin/python scripts/check_decisions_log.py

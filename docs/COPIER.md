@@ -25,7 +25,20 @@ cd <new-project>
 copier copy --trust gh:PeterFriedrich/cc-data-project-template .
 ./bootstrap.sh
 git add -A && git commit -m "Start from cc-data-project-template"
+git push -u origin master
+# Public repos: make the `test` workflow a real merge gate (copier can't carry repo settings).
+gh api -X PUT repos/PeterFriedrich/<new-project>/branches/master/protection --input - <<'JSON'
+{"required_status_checks":{"strict":false,"contexts":["test"]},"enforce_admins":false,
+ "required_pull_request_reviews":null,"restrictions":null,"allow_force_pushes":false,"allow_deletions":false}
+JSON
 ```
+
+Branch protection requires the `test` check, the job in `.github/workflows/tests.yml`.
+Without it a PR can merge while CI is red. It leaves admin override on, so the owner can
+still merge past a broken check, and doesn't require the branch to be up to date, since
+PRs merge within minutes of each other. If the job is renamed, update the required check
+too, or every PR waits on a check that never reports. GitHub's free plan has no branch
+protection for private repos, so skip this step there.
 
 Use this instead of GitHub's "Use this template": that copies the template
 repo's own backlog, decisions and handoffs, and records nothing to update from.
