@@ -75,6 +75,27 @@ venvs, downloads) that ended sessions had left in their scratchpads, about
 - **When the build finishes, delete its intermediates.** Anything worth keeping
   moves to the repo's git-ignored `data/` or `output/` area, where it is
   visible and owned. Don't leave it in scratch.
+- **On the owner's server, scratch untouched for 7 days is deleted** by a daily
+  cleanup (`server-ops/monitor/scratch-clean.sh`). If you need it longer, such
+  as a build you'll resume next session, put a `KEEP` file in the folder saying
+  why, and delete the `KEEP` when done. A `KEEP` older than 30 days raises a
+  warning.
+- **Venvs are built with uv where it is installed** (`bootstrap.sh` falls back
+  to venv + pip where it isn't). On 2026-10-16 the project venvs on the
+  owner's server held about 3.4 GB, mostly the same scientific stack repeated.
+  uv links each package from one shared cache (`~/.cache/uv`), so numpy,
+  pandas and scipy sit on disk once per machine rather than once per project.
+  On the server's XFS disk the links are copy-on-write clones, not hard links,
+  so `du` still counts every venv in full: measure the saving with `df -h /`.
+  Install packages with `uv pip install`, not `.venv/bin/pip`: a uv venv has
+  no pip, and a pip install copies files outside the cache.
+- **A venv made with pip stays a full copy until it is rebuilt.** A
+  `copier update` brings the new `bootstrap.sh`, but an existing `.venv` is
+  not rebuilt by it. To rebuild, run `rm -rf .venv && ./bootstrap.sh` in place.
+  Don't build it elsewhere and move it in, because a venv's scripts hard-code
+  its path. A worktree's symlinked `.venv` points at the path, so it survives.
+  If a scheduled job (cron, or a wrapper script it calls) runs
+  `.venv/bin/python`, rebuild outside its window.
 
 ## Going forward
 
