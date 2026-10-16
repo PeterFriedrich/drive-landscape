@@ -96,6 +96,24 @@ venvs, downloads) that ended sessions had left in their scratchpads, about
   its path. A worktree's symlinked `.venv` points at the path, so it survives.
   If a scheduled job (cron, or a wrapper script it calls) runs
   `.venv/bin/python`, rebuild outside its window.
+- ⚠️ **Before deleting a venv, check it against `requirements.txt`.** A
+  package installed by hand and never added there is silently gone after the
+  rebuild. In the 2026-10-16 rollout, alberta lost pandas this way, and
+  tax-viz would have lost pypdf and pip-audit and rolled back about 20 pins.
+  This lists what is installed but not named in `requirements.txt`, including
+  dependencies, so read it for what the code imports:
+
+  ```bash
+  norm() { cut -d= -f1 | tr 'A-Z_.' 'a-z--' | sort -u; }
+  comm -23 <(uv pip freeze --python .venv/bin/python | norm) \
+           <(grep -oE '^[A-Za-z0-9_.-]+' requirements.txt | norm)
+  ```
+
+  Pin anything missing in `requirements.txt` and commit it first. Then
+  rebuild. (Without uv: `.venv/bin/python -m pip freeze`.) The merge gate's
+  `scripts/check_requirements.py` already fails on an unpinned *import*; this
+  diff is for what it can't see: CLI tools such as pip-audit, and packages
+  loaded by name at runtime.
 
 ## Going forward
 
