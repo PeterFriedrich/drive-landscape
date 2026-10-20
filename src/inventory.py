@@ -33,7 +33,7 @@ DEFAULT_CONFIG_DIR = Path(os.environ.get("DRIVE_LANDSCAPE_CONFIG", "~/.config/dr
 DEFAULT_OUT = Path("data/raw/private/inventory")
 
 
-def build_service(config_dir: Path):
+def build_service(config_dir: Path, scopes: list[str] = SCOPES, token_name: str = "token.json"):
     """OAuth client in config_dir/credentials.json; the token is cached beside it.
 
     Both stay outside the repo. Imports are local so tests need no Google libs.
@@ -43,12 +43,12 @@ def build_service(config_dir: Path):
     from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
 
-    token_path = config_dir / "token.json"
-    creds = Credentials.from_authorized_user_file(token_path, SCOPES) if token_path.exists() else None
+    token_path = config_dir / token_name
+    creds = Credentials.from_authorized_user_file(token_path, scopes) if token_path.exists() else None
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     elif not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(config_dir / "credentials.json", SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file(config_dir / "credentials.json", scopes)
         creds = flow.run_local_server(port=0)
     token_path.write_text(creds.to_json())
     token_path.chmod(0o600)

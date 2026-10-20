@@ -67,6 +67,34 @@ Quirks to expect: a file can have no `parents` (shared with the owner one file
 at a time, or orphaned); `size` is absent for Google Docs/Sheets/Slides and
 folders, so `bytes` undercounts them.
 
+## Live inbox (`src/live.py`, `data/raw/private/live/`)
+
+One Google Doc the owner types paper notes into, a batch at a time. Layout: the
+organized list on top (`#` theme headings, one bullet per note, a `# Later`
+section last), then a `# Inbox` heading; the owner types only under Inbox.
+
+- `python -m src.live create "<title>"` — once. The app makes the doc (scope
+  `drive.file`: it can open only files it created) and writes `doc.json` (the id).
+- `python -m src.live pull` — saves the doc as Markdown to
+  `snapshots/<UTC stamp>.md`, the doc's version to `last_pull.json`, and prints
+  the Inbox lines.
+- The session writes a proposal (the organized part with the Inbox lines sorted
+  in, no Inbox heading): keep the owner's wording; a line that repeats one
+  already on the list is carried by it, not added twice; a new theme only when
+  no existing one fits; nothing is dropped.
+- `python -m src.live push <proposal.md>` — dry run: the diff, and any line of
+  the pulled doc the proposal lacks. With `--yes`, after the owner approves, it
+  writes the proposal plus an empty Inbox to the doc and saves
+  `snapshots/<stamp>-pushed.md`. It refuses if the doc changed since the pull,
+  and refuses missing lines unless `--accept-missing`, which logs them in
+  `pushes.jsonl` (with any line Drive's Markdown import did not keep).
+- Commit `live/` in the private repo after each pull and push.
+
+Its token is `token-live.json` beside the inventory's, so the inventory stays
+read-only. Markers (`*`, `-`, `1.`, `[ ]`), case and spacing do not make a line
+different. Unknown until the first real run: how faithfully Docs' Markdown
+export and import keep the text.
+
 ## Todo lists (`data/raw/private/todo/`)
 
 One folder per list, under a neutral id (`todo-001`, …); `todo/manifest.json`
