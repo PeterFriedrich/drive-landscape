@@ -157,7 +157,8 @@ from the start:
   PR. Fixtures are invented.
 - OAuth client file and token live outside both repos
   (`~/.config/drive-landscape/`). Scope is `drive.readonly` until the clean-up
-  step, which needs its own consent.
+  step, which needs its own consent. The live inbox (`src/live.py`) has its own
+  token with `drive.file`, which reaches only the one doc the app created.
 - Doc text is processed locally. Sending it to a hosted embedding or LLM API is
   not assumed and would be a decision for the owner.
 
