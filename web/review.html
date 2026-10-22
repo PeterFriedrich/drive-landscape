@@ -228,7 +228,7 @@ function groupCard(gid) {
 function renderMain() {
   const main = $("#main");
   const out = [];
-  const waiting = justSplit.map((n) => S.items[String(n)]).filter((it) => it && it.where === "undecided" && it.theme === null);
+  const waiting = justSplit.map((n) => S.items[String(n)]).filter((it) => it && ["undecided", "kept"].includes(it.where) && it.theme === null);
   if (waiting.length) {
     out.push(el("h3", {}, "Just split, not placed yet"), el("div", { class: "card" }, ...waiting.map((it) => {
       const row = itemRow(it, false);
