@@ -95,6 +95,13 @@ def test_requests_from_another_site_are_turned_away(site):
     assert (doc / "work" / "log.jsonl").read_text() == before
 
 
+def test_nearest_themes_for_the_picker(site):
+    _, url = site
+    code, body = call(url + "/api/nearest?member=t2")
+    assert code == 200 and [t["theme"] for t in json.loads(body)["themes"]] == ["t1"]
+    assert call(url + "/api/nearest?member=g99")[0] == 400
+
+
 def test_neighbours_of_an_item(site):
     doc, url = site
     code, body = call(url + "/api/neighbours?item=3")
