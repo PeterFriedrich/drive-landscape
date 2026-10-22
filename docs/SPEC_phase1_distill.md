@@ -224,10 +224,11 @@ session never has to read a whole document into its context.
 | `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
 | `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `later`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
 | `suggest <id>` | for each group and lone item in no theme, up to three themes: those of its nearest themed items, nearest first; and `new`, the themes those members could form among themselves. Logs nothing |
+| `nearest <id> <item, group or theme>` | the three themes nearest it by average distance between their items, its own left out, no cut; the theme picker lists them first. Logs nothing |
 | `export <id> [--draft]` | write `distilled.md`: confirmed groups and kept items by theme, what each line replaces, what was dropped; report what is still open. `--draft` adds unconfirmed groups, marked |
 
 Built so far (`python -m src.distill`): `status`, `propose`, `groups`,
-`themes`, `show`, `break`, the edits, `export`. There is no `confirm`
+`themes`, `show`, `suggest`, `nearest`, `break`, the edits, `export`. There is no `confirm`
 command: the owner confirms in the UI. `propose` writes `proposal.json` and starts the log
 with one `create` line per same-thing group and one `theme` line per theme,
 signed `proposal`; it refuses to

@@ -138,6 +138,16 @@ def test_suggest_points_what_is_in_no_theme_at_the_themes_of_its_nearest_items(r
     assert len(state.read_log(root / "doc-1" / "work" / "log.jsonl")) == before + 4  # suggest logs nothing
 
 
+def test_nearest_ranks_the_other_themes_for_an_item_a_group_or_a_theme(root, capsys):
+    run(root, capsys, "propose", "doc-1")  # t1: g1 (1, 2) and 3; t2: 4 and 5; 6 in no theme
+    names = lambda member: [t["theme"] for t in run(root, capsys, "nearest", "doc-1", member)[1]["themes"]]
+    assert names("t2") == ["t1"] and names("g1") == ["t2"] and names("3") == ["t2"]  # its own theme left out
+    six = run(root, capsys, "nearest", "doc-1", "6")[1]["themes"]
+    assert len(six) == 2 and six[0]["distance"] <= six[1]["distance"]  # no cut: even far themes are ranked
+    code, out = run(root, capsys, "nearest", "doc-1", "g99")
+    assert code == 1 and "no group, theme or item 'g99'" in out["error"]
+
+
 def test_long_text_is_cut(root, capsys):
     doc = root / "doc-1"
     rows = [json.loads(line) for line in (doc / "items.jsonl").read_text().splitlines()]

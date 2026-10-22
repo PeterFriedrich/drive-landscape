@@ -311,9 +311,14 @@ function picker(title, options, choose) {
   input.focus();
 }
 
-function pickTheme(title, choose, except, member) {
+// The nearest themes go on top, then every theme by name; the list opens without them if the lookup fails.
+async function pickTheme(title, choose, except, member) {
   const options = S.themes.filter((t) => t.id !== except).map((t) => ({ id: t.id, label: t.name, note: `${t.id} · ${themeSize(t)}` }))
     .sort((a, b) => a.label.localeCompare(b.label));
+  const who = member ? (member.items || member.groups)[0] : except;
+  const r = await fetch("/api/nearest?member=" + encodeURIComponent(who)).catch(() => null);
+  if (r && r.ok) options.unshift(...(await r.json()).themes.filter((n) => n.theme !== except)
+    .map((n) => ({ id: n.theme, label: themeName(n.theme), note: `nearest · ${n.distance}` })));
   if (!except) options.unshift({ id: null, label: "(no theme)", note: "" });
   if (member) options.unshift({ id: NEW, label: "(a new theme…)", note: "" });
   picker(title, options, (tid) => {

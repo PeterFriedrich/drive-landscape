@@ -6,6 +6,7 @@
     python -m src.distill themes  todo-001 [--limit N] [--offset N]
     python -m src.distill show    todo-001 g12        (or a theme: t3, an item: 412, a part: 412.1)
     python -m src.distill suggest todo-001            (themes for what is in no theme)
+    python -m src.distill nearest todo-001 t3         (the themes nearest an item, group or theme)
     python -m src.distill break   todo-001 412 --who owner "first todo" "second todo"
     python -m src.distill export  todo-001 [--draft]
 
@@ -338,6 +339,34 @@ def suggest(doc: Path, args) -> dict:
     return out
 
 
+def nearest(doc: Path, args) -> dict:
+    """The themes nearest an item, group or theme, by average distance between their items.
+
+    For the theme picker: no cut, the closest SUGGESTIONS whatever they are, its own theme left out.
+    """
+    st, _ = state.load(doc)
+    originals = read_items(doc / "items.jsonl")
+    row = {n: i for i, n in enumerate([it["n"] for it in originals] + list(st["parts"]))}
+    ts = st["themes"]
+    n = _item_id(args.member)
+    if args.member in ts:
+        ns, own = _theme_items(st, ts[args.member]), args.member
+    elif args.member in st["groups"]:
+        ns = st["groups"][args.member]["items"]
+        own = next((tid for tid, t in ts.items() if args.member in t["groups"]), None)
+    elif n in row:
+        ns, own = [n], next((tid for tid, t in ts.items() if n in _theme_items(st, t)), None)
+    else:
+        raise DistillError(f"no group, theme or item {args.member!r}")
+    others = {tid: [row[m] for m in _theme_items(st, t)] for tid, t in ts.items() if tid != own}
+    others = {tid: rows for tid, rows in others.items() if rows}
+    if not ns or not others:
+        return {"member": args.member, "themes": []}
+    distance = _distance(doc, originals, st)[[row[m] for m in ns]]
+    ranked = sorted((float(distance[:, rows].mean()), tid) for tid, rows in others.items())[:SUGGESTIONS]
+    return {"member": args.member, "themes": [{"theme": tid, "distance": round(d, 3)} for d, tid in ranked]}
+
+
 def break_item(doc: Path, args) -> dict:
     n = _item_id(args.item)
     state.append(doc, {"who": args.who, "op": "break", "item": n, "parts": args.parts})
@@ -460,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
         for arg in spec.split():
             p.add_argument(arg.rstrip("+"), **({"nargs": "+"} if arg.endswith("+") else {}))
         p.add_argument("--who", default="agent", choices=("agent", "owner"))
-    for fn in (status, propose, groups, themes, show, suggest, break_item, export):
+    for fn in (status, propose, groups, themes, show, suggest, nearest, break_item, export):
         p = sub.add_parser(fn.__name__.removesuffix("_item"))
         p.set_defaults(fn=fn)
         p.add_argument("id", help="document id, e.g. todo-001")
@@ -470,6 +499,8 @@ def main(argv: list[str] | None = None) -> int:
         if fn is show:
             p.add_argument("group", help="a group id (g12), a theme id (t3), an item (412) or a part (412.1)")
             p.add_argument("--limit", type=int, default=50)
+        if fn is nearest:
+            p.add_argument("member", help="an item (412), a part (412.1), a group (g12) or a theme (t3)")
         if fn is break_item:
             p.add_argument("item", help="an item (412) or a part (412.1)")
             p.add_argument("parts", nargs="+", help="the text of each new item")

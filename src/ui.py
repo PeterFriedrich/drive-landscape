@@ -9,6 +9,7 @@ the page then reads the state again. Nothing here holds state of its own.
     GET  /                      the page
     GET  /api/state             counts, themes, groups and items as they stand
     GET  /api/neighbours?item=N the item's nearest neighbours (src.distill show)
+    GET  /api/nearest?member=M  the themes nearest an item, group or theme (src.distill nearest)
     GET  /api/suggest           themes for the groups and lone items in no theme (src.distill suggest)
     GET  /api/preview           the new list as it stands, groups not yet confirmed included (src.distill distilled)
     POST /api/log               one log entry without "who"; new groups and themes get an id
@@ -150,6 +151,9 @@ def handler(doc: Path) -> type[BaseHTTPRequestHandler]:
             elif url.path == "/api/neighbours":
                 item = parse_qs(url.query).get("item", [""])[0]
                 self.answer(lambda: distill.show(doc, argparse.Namespace(group=item, limit=1)))
+            elif url.path == "/api/nearest":
+                member = parse_qs(url.query).get("member", [""])[0]
+                self.answer(lambda: distill.nearest(doc, argparse.Namespace(member=member)))
             else:
                 self.send(404, b'{"error": "not found"}')
 
