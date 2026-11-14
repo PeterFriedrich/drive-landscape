@@ -19,6 +19,8 @@ top-down, fundamental decisions first.
 
 ## Queued — briefed, not yet run
 
+- 2026-11-14: private data on the public repo's surfaces (files, full history, commit messages, PRs, issues, handoffs), beyond what `check_no_private_data.py` catches. Brief: `docs/AUDIT_privacy_leak.md`. For a Fable run; findings go in the private repo.
+
 ## Never audited (candidates, roughly ranked)
 
 - <the data join / the denominator / the published headline number …>
