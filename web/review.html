@@ -75,7 +75,7 @@ dialog .hint { color:var(--soft); font-size:13px; margin:6px 0; }
 "use strict";
 // Item text is only ever set through textContent / value, never as HTML.
 let S = null, current = null, justSplit = [], hints = { items: {}, groups: {}, new: [] };
-const NONE = "", DROPPED = "~dropped", LATER = "~later", NEW = "~new", NEARBY = 5;
+const NONE = "", DROPPED = "~dropped", LATER = "~later", IMMEDIATE = "~immediate", NEW = "~new", NEARBY = 5;
 const $ = (s) => document.querySelector(s);
 
 function el(tag, props = {}, ...kids) {
@@ -137,12 +137,14 @@ const groupItems = (gid) => S.groups[gid].items.map((n) => S.items[String(n)]);
 const themeItems = (t) => t.items.map((n) => S.items[String(n)]);
 const themeSize = (t) => t.items.length + t.groups.reduce((a, gid) => a + S.groups[gid].items.length, 0);
 const themeLater = (tid) => S.themes.some((t) => t.id === tid && t.later);
+const themeImmediate = (tid) => S.themes.some((t) => t.id === tid && t.immediate);
 const alone = (it) => it.where === "undecided" || it.where === "kept";
 
 function sections() {
   const rows = S.themes.map((t) => ({ id: t.id, name: t.name, size: themeSize(t), done: t.confirmed, later: t.later })).sort((a, b) => a.later - b.later || b.size - a.size);
   const looseItems = items().filter((it) => alone(it) && it.theme === null).length;
   const looseGroups = Object.values(S.groups).filter((g) => g.theme === null).length;
+  rows.unshift({ id: IMMEDIATE, name: "Immediate", size: S.counts.immediate });
   rows.push({ id: NONE, name: "In no theme", size: looseItems + looseGroups });
   rows.push({ id: LATER, name: "Later", size: S.counts.later });
   rows.push({ id: DROPPED, name: "Dropped", size: S.counts.dropped });
@@ -155,9 +157,9 @@ function render() {
   $("#save").textContent = S.unsaved ? "Save" : S.unsaved === false ? "Saved" : "Save (no repository)";
   $("#save").className = S.unsaved ? "due" : "";
   $("#save").disabled = !S.unsaved;
-  $("#counts").textContent = `${c.undecided} undecided · ${c.in_groups} in ${c.groups} groups (${c.groups_confirmed} confirmed) · ${c.kept} kept · ${c.later} later · ${c.dropped} dropped · ${c.broken} split into ${c.parts} · ${c.themes} themes (${c.themes_confirmed} confirmed)`;
+  $("#counts").textContent = `${c.undecided} undecided · ${c.in_groups} in ${c.groups} groups (${c.groups_confirmed} confirmed) · ${c.kept} kept · ${c.later} later · ${c.immediate} immediate · ${c.dropped} dropped · ${c.broken} split into ${c.parts} · ${c.themes} themes (${c.themes_confirmed} confirmed)`;
   const rows = sections();
-  if (current === null || !rows.some((r) => r.id === current)) current = rows[0].id;
+  if (current === null || !rows.some((r) => r.id === current)) current = rows[0].size ? rows[0].id : (rows[1] || rows[0]).id;
   const q = $("#filter").value.trim().toLowerCase();
   const list = $("#themes");
   list.replaceChildren(...rows.filter((r) => !q || r.name.toLowerCase().includes(q) || r.id === current).map((r) =>
@@ -184,6 +186,7 @@ function itemRow(it, inGroup) {
     acts.append(btn("Group…", () => pickGroup(it)));
     acts.append(btn("Similar", () => similar(it)));
     acts.append(btn("Nearby", () => nearby(it)));
+    if (!inGroup && !themeImmediate(it.theme)) acts.append(btn(it.immediate ? "Untag immediate" : "Immediate", () => send({ op: "immediate", item: it.n, on: !it.immediate })));
     if (!inGroup && !themeLater(it.theme)) acts.append(btn(it.later ? "Not later" : "Later", () => send({ op: "later", item: it.n, on: !it.later })));
     acts.append(btn("Drop", () => { const reason = prompt("Why drop it?"); if (reason) send({ op: "drop", item: it.n, reason }); }));
   }
@@ -193,6 +196,7 @@ function itemRow(it, inGroup) {
     el("span", { class: "tx" }, it.draft || it.text,
       it.where === "kept" ? badge(it.confirmed ? "kept ✓" : "kept", "ok") : null,
       later ? badge("later") : null,
+      !inGroup && (it.immediate || (it.where === "kept" && themeImmediate(it.theme))) ? badge("immediate", "warn") : null,
       it.where === "dropped" ? badge(it.reason, "warn") : null,
       it.draft ? el("span", { class: "was" }, "was: " + it.text) : null,
       !inGroup && it.theme === null && alone(it) ? hintBar("items", String(it.n)) : null),
@@ -215,13 +219,15 @@ function candidateCard(c) {
 function groupCard(gid) {
   const g = S.groups[gid], later = g.later || themeLater(g.theme);
   const head = el("div", { class: "head" }, el("b", {}, g.draft || g.name), badge(gid),
-    g.confirmed ? badge("confirmed", "ok") : null, later ? badge("later") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
+    g.confirmed ? badge("confirmed", "ok") : null, later ? badge("later") : null,
+    g.immediate || themeImmediate(g.theme) ? badge("immediate", "warn") : null, g.flag ? badge("flag: " + g.flag, "warn") : null);
   const bar = el("div", { class: "bar" },
     g.confirmed ? null : btn("Confirm group", () => send({ op: "confirm", group: gid }), "main"),
     btn("Edit line", () => { const text = prompt("The line in the new list:", g.draft || g.name); if (text) send({ op: "draft", group: gid, text }); }),
     btn("Rename", () => { const name = prompt("Group name:", g.name); if (name) send({ op: "rename", group: gid, name }); }),
     btn("Theme…", () => pickTheme("Put this group in which theme?", (tid) => send({ op: "assign", group: gid, theme: tid }), null, { groups: [gid] })),
-    themeLater(g.theme) ? null : btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })));
+    themeLater(g.theme) ? null : btn(g.later ? "Not later" : "Later", () => send({ op: "later", group: gid, on: !g.later })),
+    themeImmediate(g.theme) ? null : btn(g.immediate ? "Untag immediate" : "Immediate", () => send({ op: "immediate", group: gid, on: !g.immediate })));
   return el("div", { class: "card" + (g.confirmed ? " done" : "") + (later ? " later" : "") }, head, bar, g.theme === null ? hintBar("groups", gid) : null, ...groupItems(gid).map((it) => itemRow(it, true)));
 }
 
@@ -232,12 +238,27 @@ function renderMain() {
   if (waiting.length) {
     out.push(el("h3", {}, "Just split, not placed yet"), el("div", { class: "card" }, ...waiting.map((it) => {
       const row = itemRow(it, false);
-      if (![NONE, DROPPED, LATER].includes(current))
+      if (![NONE, DROPPED, LATER, IMMEDIATE].includes(current))
         row.querySelector(".acts").prepend(btn("Put here", () => send({ op: "assign", item: it.n, theme: current }), "main"));
       return row;
     })));
   }
-  if (current === DROPPED) {
+  if (current === IMMEDIATE) {
+    // What carries the mark, at the level it was set: a marked theme is one block, untagged as a whole.
+    out.push(el("h2", {}, "Immediate"));
+    const marked = S.themes.filter((t) => t.immediate);
+    for (const t of marked)
+      out.push(el("div", { class: "card" },
+        el("div", { class: "head" }, el("b", {}, "All of " + t.name), badge(themeSize(t) + " items")),
+        el("div", { class: "bar" },
+          btn("Untag theme", () => send({ op: "immediate", theme: t.id, on: false }), "main"),
+          btn("Open theme", () => { current = t.id; render(); }))));
+    const own = (tid) => !marked.some((t) => t.id === tid);
+    out.push(...Object.keys(S.groups).filter((gid) => S.groups[gid].immediate && own(S.groups[gid].theme)).map(groupCard));
+    const loose = items().filter((it) => it.immediate && own(it.theme));
+    if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
+    if (out.length === 1) out.push(el("div", { class: "hint" }, "Nothing is marked Immediate. Mark a line, group or theme with its Immediate button and it shows here."));
+  } else if (current === DROPPED) {
     out.push(el("h2", {}, "Dropped"), el("div", { class: "card" }, ...items().filter((it) => it.where === "dropped").map((it) => itemRow(it, false))));
   } else if (current === LATER) {
     const loose = items().filter((it) => it.later || (it.where === "kept" && themeLater(it.theme)));
@@ -253,7 +274,7 @@ function renderMain() {
     if (loose.length) out.push(el("h3", {}, `Items on their own (${loose.length})`), el("div", { class: "card" }, ...loose.map((it) => itemRow(it, false))));
   } else {
     const t = S.themes.find((t) => t.id === current);
-    out.push(el("h2", {}, t.name, " ", badge(t.id), t.confirmed ? badge("confirmed", "ok") : null, t.later ? badge("later") : null));
+    out.push(el("h2", {}, t.name, " ", badge(t.id), t.confirmed ? badge("confirmed", "ok") : null, t.later ? badge("later") : null, t.immediate ? badge("immediate", "warn") : null));
     out.push(el("div", { class: "bar" },
       t.confirmed ? null : btn("Confirm theme", () => send({ op: "confirm", theme: t.id }), "main"),
       btn("Rename", () => { const name = prompt("Theme name:", t.name); if (name) send({ op: "rename", theme: t.id, name }); }),
@@ -261,6 +282,11 @@ function renderMain() {
         const open = themeItems(t).filter((it) => it.where === "undecided").length;
         if (t.later || !open || confirm(`Mark the whole theme Later? Its ${open} undecided item${open === 1 ? "" : "s"} will be kept. Move any that do not belong first.`))
           send({ op: "later", theme: t.id, on: !t.later });
+      }),
+      btn(t.immediate ? "Untag immediate" : "Immediate", () => {
+        const open = themeItems(t).filter((it) => it.where === "undecided").length;
+        if (t.immediate || !open || confirm(`Mark the whole theme Immediate? Its ${open} undecided item${open === 1 ? "" : "s"} will be kept.`))
+          send({ op: "immediate", theme: t.id, on: !t.immediate });
       }),
       btn("Drop theme", () => {
         const reason = prompt(`Drop all ${themeSize(t)} items in this theme, the ones inside its ${t.groups.length} groups too? Move any that do not belong first. Why drop them?`);

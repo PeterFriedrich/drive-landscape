@@ -398,9 +398,9 @@ def _new_theme(doc: Path, a) -> dict:
             "groups": [m["group"] for m in members if "group" in m], "items": [m["item"] for m in members if "item" in m]}
 
 
-def _later(doc: Path, a) -> dict:
+def _mark(doc: Path, a) -> dict:
     if a.on not in ("on", "off"):
-        raise DistillError(f"later takes on or off, not {a.on!r}")
+        raise DistillError(f"{a.command} takes on or off, not {a.on!r}")
     target = {"theme": a.member} if a.member in state.load(doc)[0]["themes"] else _member(a.member)
     return {**target, "on": a.on == "on"}
 
@@ -417,7 +417,8 @@ EDITS = {
     "unassign": ("item", lambda doc, a: {"item": _item(a.item)}),
     "draft": ("member text", lambda doc, a: {**_member(a.member), "text": a.text}),
     "flag": ("group note", lambda doc, a: {"group": a.group, "note": a.note}),
-    "later": ("member on", _later),
+    "later": ("member on", _mark),
+    "immediate": ("member on", _mark),
     "theme": ("name members+", _new_theme),
     "assign": ("member theme", lambda doc, a: {**_member(a.member), "theme": None if a.theme == "none" else a.theme}),
     "fold": ("into themes+", lambda doc, a: {"into": a.into, "themes": a.themes}),
@@ -438,36 +439,51 @@ def distilled(doc: Path, draft: bool) -> tuple[str, dict]:
     sections: dict = {}
     later: list = []
 
-    def place(key: tuple, marked: bool, ns: list, line: str) -> None:
+    immediate: list = []  # (key, line): shown again at the top, numbered like the line it repeats
+
+    def place(key: tuple, marks: dict, ns: list, line: str) -> None:
         tid = section_of.get(key)
-        if marked or (tid is not None and st["themes"][tid]["later"]):
-            later.append((ns, line + (f" ({st['themes'][tid]['name']})" if tid is not None else "")))
+        named = line + (f" ({st['themes'][tid]['name']})" if tid is not None else "")
+        if marks["immediate"] and not (tid is not None and st["themes"][tid]["immediate"]):
+            immediate.append((key, named))
+        if marks["later"] or (tid is not None and st["themes"][tid]["later"]):
+            later.append((ns, named, key))
         else:
-            sections.setdefault(tid, []).append((ns, line))
+            sections.setdefault(tid, []).append((ns, line, key))
 
     for gid, g in st["groups"].items():
         if g["confirmed"] or draft:
             line = (g["draft"] or g["name"]) + ("" if g["confirmed"] else " (not confirmed)")
-            place(("g", gid), g["later"], oldest_first(g["items"]), line)
+            place(("g", gid), g, oldest_first(g["items"]), line)
     for n, k in st["kept"].items():
-        place(("i", n), k["later"], [n], k["draft"] or text[n])
+        place(("i", n), k, [n], k["draft"] or text[n])
     # Largest section first, items in no theme last; within a section, oldest first.
     order = sorted(sections, key=lambda tid: (tid is None, -len(sections[tid]), str(tid)))
     out, appendix, k = [f"# {doc.name}, distilled", ""], [], 0
     titled = [(st["themes"][tid]["name"] if tid is not None else "In no theme", sections[tid]) for tid in order]
+    number: dict = {}
     for title, rows in titled + ([("Later", later)] if later else []):
         out += [f"## {title}", ""]
-        for ns, line in sorted(rows, key=lambda row: state.order(row[0][0])):
+        for ns, line, key in sorted(rows, key=lambda row: state.order(row[0][0])):
             k += 1
+            number[key] = k
             out.append(f"- {line} [{k}]")
             appendix += [f"**[{k}]** {line}", ""] + [f"- {n}: {text[n]}" for n in ns] + [""]
         out.append("")
+    # A marked theme is one entry, so untagging it is one step; its lines are listed by number.
+    top = [f"- {line} [{number[key]}]" for key, line in sorted(immediate, key=lambda row: number[row[0]])]
+    for tid, t in st["themes"].items():
+        ks = sorted(number[key] for key, owner_tid in section_of.items() if owner_tid == tid and key in number)
+        if t["immediate"] and ks:
+            top.append(f"- All of {t['name']}: " + ", ".join(f"[{x}]" for x in ks))
+    if top:
+        out[2:2] = ["## Immediate", "", *top, ""]
     out += ["## What each line replaces", ""] + appendix
     out += ["## Dropped", ""] + [f"- {n}: {text[n]} — {st['dropped'][n]}" for n in oldest_first(st["dropped"])] + [""]
     left = {"undecided": counts["undecided"], "groups_not_confirmed": counts["groups"] - counts["groups_confirmed"]}
     out += ["## Still open", "", f"- {left['undecided']} items undecided",
             f"- {left['groups_not_confirmed']} groups not confirmed" + ("" if draft else " (left out; --draft includes them)"), ""]
-    return "\n".join(out), {"lines": k, "sections": len(order), "later": len(later), "dropped": counts["dropped"], **left}
+    return "\n".join(out), {"lines": k, "sections": len(order), "later": len(later), "immediate": len(top), "dropped": counts["dropped"], **left}
 
 
 def export(doc: Path, args) -> dict:
