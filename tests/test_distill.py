@@ -286,7 +286,7 @@ def test_edits_append_one_line_each_and_number_new_groups_and_themes(root, capsy
         assert fields.items() <= out["logged"].items()
     st, _ = state.load(doc)
     assert {gid: g["items"] for gid, g in st["groups"].items()} == {"g1": [1, 2, 3], "g2": [4, 5], "g4": [6]}
-    assert st["themes"] == {"t1": {"name": st["themes"]["t1"]["name"], "groups": ["g1", "g2"], "items": [], "later": False, "confirmed": False}}
+    assert st["themes"] == {"t1": {"name": st["themes"]["t1"]["name"], "groups": ["g1", "g2"], "items": [], "later": False, "immediate": False, "confirmed": False}}
     assert len(state.read_log(doc / "work" / "log.jsonl")) == 3 + len(steps)
 
     code, out = run(root, capsys, "fold", "doc-1", "t1", "t9")
@@ -294,6 +294,38 @@ def test_edits_append_one_line_each_and_number_new_groups_and_themes(root, capsy
     code, out = run(root, capsys, "keep", "doc-1", "g1")
     assert code == 1 and "not an item: 'g1'" in out["error"]
     assert len(state.read_log(doc / "work" / "log.jsonl")) == 3 + len(steps)
+
+
+def test_immediate_repeats_a_line_at_the_top_and_untags(root, capsys):
+    run(root, capsys, "propose", "doc-1")
+    doc = root / "doc-1"
+    run(root, capsys, "draft", "doc-1", "g1", "Oil the gate hinge")
+    run(root, capsys, "keep", "doc-1", "3")
+    assert run(root, capsys, "immediate", "doc-1", "g1", "maybe")[0] == 1
+    run(root, capsys, "immediate", "doc-1", "g1", "on")
+    run(root, capsys, "immediate", "doc-1", "4", "on")  # undecided, so it is kept too
+    code, out = run(root, capsys, "export", "doc-1", "--draft")
+    assert out["immediate"] == 2 and 4 in state.load(doc)[0]["kept"]
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    top = lines.index("## Immediate")
+    assert top == 2 and top < min(i for i, l in enumerate(lines) if l.startswith("## ") and i > top)
+    shown = [l for l in lines[top + 2 :] if l.startswith("- ")][:2]
+    for line in shown:  # each repeat names the number of the line it repeats, which is still in place
+        k = line.rsplit("[", 1)[1]
+        assert sum(l.endswith(f"[{k}") and l.startswith("- ") for l in lines) == 2
+    assert out["lines"] == 3  # the repeats are not new lines
+
+    t1 = next(iter(state.load(doc)[0]["themes"]))
+    run(root, capsys, "immediate", "doc-1", t1, "on")
+    run(root, capsys, "export", "doc-1", "--draft")
+    lines = (doc / "work" / "distilled.md").read_text().splitlines()
+    whole = [l for l in lines if l.startswith("- All of ")]
+    assert len(whole) == 1 and lines.index("## Immediate") < lines.index(whole[0])
+
+    for member in ("g1", "4", t1):
+        run(root, capsys, "immediate", "doc-1", member, "off")
+    code, out = run(root, capsys, "export", "doc-1", "--draft")
+    assert out["immediate"] == 0 and "## Immediate" not in (doc / "work" / "distilled.md").read_text()
 
 
 def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
@@ -306,7 +338,7 @@ def test_export_writes_confirmed_groups_and_kept_items_by_theme(root, capsys):
     code, out = run(root, capsys, "export", "doc-1")
     assert code == 0
     assert {k: v for k, v in out.items() if k != "wrote"} == {
-        "lines": 2, "sections": 2, "later": 0, "dropped": 1, "undecided": 1, "groups_not_confirmed": 1}
+        "lines": 2, "sections": 2, "later": 0, "immediate": 0, "dropped": 1, "undecided": 1, "groups_not_confirmed": 1}
     md = (doc / "work" / "distilled.md").read_text()
     assert "Oil the gate hinge" not in md and "- fix the gate latch [1]" in md
     assert "- 6: learn the accordion — not this year" in md

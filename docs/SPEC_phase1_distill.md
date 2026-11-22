@@ -222,7 +222,7 @@ session never has to read a whole document into its context.
 | `themes <id> [--limit N] [--offset N]` | the themes as they stand in the log, largest first: name, size, groups, age span, how many items are undecided, confirmed |
 | `show <id> <group, theme or item>` | its items in age order, with their nearest outside neighbours; for one item that has several sentences, the sentence-by-sentence split |
 | `break <id> <item> --who owner <text> <text> ...` | the owner's: split one item into one item per text |
-| `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `later`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
+| `create`, `rename`, `merge`, `split`, `move`, `keep`, `drop`, `unassign`, `draft`, `flag`, `later`, `immediate`, `theme`, `assign`, `fold`, `undo` | the edits, each one log line signed `--who` (default `agent`); new groups and themes get the next free id. `section` is not built |
 | `suggest <id>` | for each group and lone item in no theme, up to three themes: those of its nearest themed items, nearest first; and `new`, the themes those members could form among themselves. Logs nothing |
 | `nearest <id> <item, group or theme>` | the three themes nearest it by average distance between their items, its own left out, no cut; the theme picker lists them first. Logs nothing |
 | `export <id> [--draft]` | write `distilled.md`: confirmed groups and kept items by theme, what each line replaces, what was dropped; report what is still open. `--draft` adds unconfirmed groups, marked |
@@ -263,7 +263,10 @@ new one named on the spot, also per group), group, nearby (the five entries writ
 before and just after it in the original list, with the same one-click buttons), similar (nearest
 neighbours with one-click "same group" / "same theme"), pull out. Per group
 and theme: confirm, rename, edit the line, move, fold. Per item on its own and
-per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped". Per theme:
+per group: **Later** (and "Not later"), with a "Later" screen beside "Dropped", and
+**Immediate** (and "Untag immediate"), with an "Immediate" screen at the top of the theme list
+that shows what carries the mark at the level it was set (a marked theme as one block) and
+untags it there. Per theme:
 A group or lone item in no theme shows up to three **nearest themes** as one-click
 buttons (`suggest`: the themes of its nearest items that have one, none when the
 nearest is farther than the theme cut); this is how split parts find a home. The
@@ -298,7 +301,13 @@ entry also makes it easier to place; the line is embedded on first use, as a
 split part is. Marking a theme later is one
 log line: every line of the theme goes to the "Later" section and the theme's
 undecided items are kept. The mark stays with the theme, so what joins it
-afterwards is later too and what leaves it is not. Re-running
+afterwards is later too and what leaves it is not. A group, kept item or theme
+marked **immediate** (`immediate <id> <group, item or theme> on|off`, owner
+2026-11-22) follows the same rules, but its line stays where it is and is also
+shown in an "Immediate" section at the top of the list, numbered like the line
+it repeats, with the theme's name after it; a marked theme is one entry there
+("All of <theme>" and its line numbers), so it is untagged as a whole. The
+repeats are not new lines. A line can be both later and immediate. Re-running
 the export after more review rewrites it from the log, so edits belong in the
 UI, not in the exported file.
 

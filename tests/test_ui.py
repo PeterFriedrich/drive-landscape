@@ -73,6 +73,11 @@ def test_an_action_is_one_log_line_signed_owner(site):
     snap = json.loads(call(url + "/api/state")[1])
     assert (snap["items"]["6.2"]["later"], snap["items"]["6.2"]["where"], snap["items"]["6.2"]["theme"]) == (True, "kept", "t1")
     assert snap["groups"]["g2"]["later"] is True and snap["groups"]["g2"]["confirmed"] is True and snap["counts"]["later"] == 2
+    assert call(url + "/api/log", {"op": "immediate", "item": "6.2", "on": True})[0] == 200
+    snap = json.loads(call(url + "/api/state")[1])
+    assert snap["items"]["6.2"]["immediate"] is True and snap["counts"]["immediate"] == 1
+    assert call(url + "/api/log", {"op": "immediate", "item": "6.2", "on": False})[0] == 200
+    assert json.loads(call(url + "/api/state")[1])["items"]["6.2"]["immediate"] is False
     code, body = call(url + "/api/log", {"op": "theme", "name": "music", "groups": [], "items": ["6.2"]})  # as the page's "(a new theme…)" sends it
     new = json.loads(body)["logged"]["theme"]
     assert code == 200 and json.loads(call(url + "/api/state")[1])["items"]["6.2"]["theme"] == new != "t1"
