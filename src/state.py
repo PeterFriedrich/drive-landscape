@@ -25,6 +25,8 @@ fields}; "proposal" is the grouping algorithm (src/distill.py propose):
                                    the new list; an undecided item is kept by it. on false: unmarked.
                                    A theme: every line of the theme goes there, and its undecided
                                    items are kept
+    immediate group | item | theme, on   like later, but its line is also shown in the "Immediate"
+                                   section at the top of the new list; it stays where it is too
     theme     theme, name, groups, items   a new theme: a named section of the new list, holding
                                    groups and single items, each from whichever theme it was in
     assign    group | item, theme  into that theme from whichever it was in; theme null: into none
@@ -39,7 +41,8 @@ does not hold them. A theme holds whole groups, and items that stand alone
 its theme, a group split off another starts in the same theme, and a group or
 theme that loses its last member is gone. Changing a confirmed group in any way
 unconfirms it, and so does changing a confirmed theme's name or members; a flag
-or a later mark changes neither. A later mark stays with its group or kept item
+or a later or immediate mark changes neither. An immediate mark follows the same
+rules as a later one. A later mark stays with its group or kept item
 (a group split off a marked group is marked too) and goes when the item stops
 being kept. A later mark on a theme stays with the theme: what joins the theme
 afterwards is later too (an undecided item that joins is not kept by that), what
@@ -136,7 +139,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
         if gid in groups:
             raise LogError(f"group {gid!r} already exists")
         name = _text(e, "name")
-        groups[gid] = {"name": name, "items": [], "draft": None, "flag": None, "later": False, "confirmed": False}
+        groups[gid] = {"name": name, "items": [], "draft": None, "flag": None, "later": False, "immediate": False, "confirmed": False}
         return groups[gid]
 
     def item() -> int:
@@ -208,7 +211,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
         if len(ns) == len(g["items"]):
             raise LogError(f"would leave {e['group']!r} empty")
         new = new_group("new")
-        new["later"] = g["later"]
+        new["later"], new["immediate"] = g["later"], g["immediate"]
         for n in ns:
             take(n)
         put(new, ns)
@@ -223,29 +226,29 @@ def _apply(state: dict, known: set, e: dict) -> None:
         n = item()
         if n not in kept:
             take(n, themed=True)
-            kept[n] = {"draft": None, "confirmed": False, "later": False}
-    elif op == "later":
+            kept[n] = {"draft": None, "confirmed": False, "later": False, "immediate": False}
+    elif op in ("later", "immediate"):
         on = e.get("on")
         if not isinstance(on, bool):
             raise LogError("on must be true or false")
         kind = one_of("group", "item", "theme")
         if kind == "group":
-            group()["later"] = on
+            group()[op] = on
         elif kind == "theme":
             t = theme()
-            t["later"] = on
+            t[op] = on
             for n in t["items"] if on else []:
                 if n in undecided:
                     undecided.discard(n)
-                    kept[n] = {"draft": None, "confirmed": False, "later": False}
+                    kept[n] = {"draft": None, "confirmed": False, "later": False, "immediate": False}
         else:
             n = loose(e["item"])
             if n not in kept:
                 if not on:
                     raise LogError(f"item {n} is not kept")
                 take(n, themed=True)
-                kept[n] = {"draft": None, "confirmed": False, "later": False}
-            kept[n]["later"] = on
+                kept[n] = {"draft": None, "confirmed": False, "later": False, "immediate": False}
+            kept[n][op] = on
     elif op == "drop":
         reason = _text(e, "reason")
         if one_of("item", "theme") == "item":
@@ -282,7 +285,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
             n = loose(e["item"])
             if n not in kept:
                 take(n, themed=True)
-                kept[n] = {"draft": None, "confirmed": False, "later": False}
+                kept[n] = {"draft": None, "confirmed": False, "later": False, "immediate": False}
             target = kept[n]
         target["draft"], target["confirmed"] = _text(e, "text"), False
     elif op == "flag":
@@ -305,7 +308,7 @@ def _apply(state: dict, known: set, e: dict) -> None:
         for kind, members in (("groups", gids), ("items", ns)):
             for m in members:
                 leave(kind, m)
-        themes[tid] = {"name": name, "groups": [], "items": [], "later": False, "confirmed": False}
+        themes[tid] = {"name": name, "groups": [], "items": [], "later": False, "immediate": False, "confirmed": False}
         join(themes[tid], "groups", gids)
         join(themes[tid], "items", ns)
     elif op == "assign":
@@ -368,6 +371,15 @@ def replay(item_ns: list, entries: list[dict]) -> dict:
     return state
 
 
+def _marked(state: dict, mark: str) -> int:
+    """Groups and kept items carrying the mark, their own or their theme's, each counted once."""
+    groups, kept = state["groups"], state["kept"]
+    return len({("g", gid) for gid, g in groups.items() if g[mark]}
+               | {("i", n) for n, k in kept.items() if k[mark]}
+               | {(kind[0], m) for t in state["themes"].values() if t[mark] for kind in ("groups", "items")
+                  for m in t[kind] if kind == "groups" or m in kept})
+
+
 def account(item_ns: list, state: dict) -> dict:
     """Counts, after checking every item is in exactly one place: a group, kept, dropped or undecided.
 
@@ -415,10 +427,8 @@ def account(item_ns: list, state: dict) -> dict:
         "groups_confirmed": sum(g["confirmed"] for g in groups.values()),
         "groups_flagged": sum(g["flag"] is not None for g in groups.values()),
         "kept_confirmed": sum(k["confirmed"] for k in state["kept"].values()),
-        "later": len({("g", gid) for gid, g in groups.items() if g["later"]}
-                     | {("i", n) for n, k in state["kept"].items() if k["later"]}
-                     | {(kind[0], m) for t in themes.values() if t["later"] for kind in ("groups", "items")
-                        for m in t[kind] if kind == "groups" or m in state["kept"]}),
+        "later": _marked(state, "later"),
+        "immediate": _marked(state, "immediate"),
         "themes": len(themes),
         "themes_confirmed": sum(t["confirmed"] for t in themes.values()),
         "in_no_theme": len(groups) - len(themed_groups) + len(alone) - len(themed_items),

@@ -91,6 +91,7 @@ def snapshot(doc: Path) -> dict:
             "reason": st["dropped"].get(n),
             "confirmed": st["kept"].get(n, {}).get("confirmed", False),
             "later": st["kept"].get(n, {}).get("later", False),
+            "immediate": st["kept"].get(n, {}).get("immediate", False),
             "draft": st["kept"].get(n, {}).get("draft"),
         }
     return {

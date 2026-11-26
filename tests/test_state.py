@@ -28,7 +28,7 @@ def test_empty_log_leaves_everything_undecided():
     assert state["undecided"] == set(NS)
     assert account(NS, state) == {
         "items": 6, "in_groups": 0, "kept": 0, "dropped": 0, "undecided": 6, "broken": 0, "parts": 0,
-        "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0, "later": 0,
+        "groups": 0, "groups_confirmed": 0, "groups_flagged": 0, "kept_confirmed": 0, "later": 0, "immediate": 0,
         "themes": 0, "themes_confirmed": 0, "in_no_theme": 6,
     }
 
@@ -71,7 +71,7 @@ def test_merge_and_split():
     assert set(state["groups"]) == {"g1", "g3"}
     assert state["groups"]["g1"]["items"] == [2, 3]
     assert state["groups"]["g3"] == {
-        "name": "shed", "items": [1, 4], "draft": None, "flag": None, "later": False, "confirmed": False,
+        "name": "shed", "items": [1, 4], "draft": None, "flag": None, "later": False, "immediate": False, "confirmed": False,
     }
 
 
@@ -221,7 +221,7 @@ THEMED = BASE + [agent("theme", theme="t1", name="outdoors", groups=["g1"], item
 
 def test_a_theme_holds_groups_and_items_that_stand_alone():
     state = replay(NS, THEMED)
-    assert state["themes"]["t1"] == {"name": "outdoors", "groups": ["g1"], "items": [6], "later": False, "confirmed": False}
+    assert state["themes"]["t1"] == {"name": "outdoors", "groups": ["g1"], "items": [6], "later": False, "immediate": False, "confirmed": False}
     counts = account(NS, state)
     assert (counts["themes"], counts["themes_confirmed"], counts["in_no_theme"]) == (2, 0, 0)
     assert account(NS, replay(NS, BASE))["in_no_theme"] == 4  # g1, g2, kept 5, undecided 6
@@ -237,7 +237,7 @@ def test_assign_fold_and_rename_a_theme():
     assert state["themes"]["t2"]["name"] == "paper"
     assert account(NS, state)["in_no_theme"] == 1
     state = replay(NS, THEMED + [agent("fold", into="t1", themes=["t2"])])
-    assert state["themes"] == {"t1": {"name": "outdoors", "groups": ["g1", "g2"], "items": [5, 6], "later": False, "confirmed": False}}
+    assert state["themes"] == {"t1": {"name": "outdoors", "groups": ["g1", "g2"], "items": [5, 6], "later": False, "immediate": False, "confirmed": False}}
 
 
 def test_an_item_leaves_its_theme_when_it_stops_standing_alone():
@@ -338,7 +338,7 @@ def test_later_marks_a_group_or_a_kept_item_and_keeps_an_undecided_one():
         owner("later", item=5, on=False),
     ])
     assert state["groups"]["g1"]["later"] is True and state["groups"]["g1"]["confirmed"] is True
-    assert state["kept"] == {5: {"draft": None, "confirmed": False, "later": False}, 6: {"draft": None, "confirmed": False, "later": True}}
+    assert state["kept"] == {5: {"draft": None, "confirmed": False, "later": False, "immediate": False}, 6: {"draft": None, "confirmed": False, "later": True, "immediate": False}}
     counts = account(NS, state)
     assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)
 
@@ -352,8 +352,8 @@ def test_a_later_mark_follows_a_split_and_goes_when_the_item_is_no_longer_kept()
 
 def test_draft_rewords_a_kept_item_keeps_an_undecided_one_and_unconfirms():
     state = replay(NS, BASE + [owner("confirm", item=5), owner("draft", item=5, text="file the forms"), owner("draft", item=6, text="buy stamps")])
-    assert state["kept"] == {5: {"draft": "file the forms", "confirmed": False, "later": False},
-                             6: {"draft": "buy stamps", "confirmed": False, "later": False}}
+    assert state["kept"] == {5: {"draft": "file the forms", "confirmed": False, "later": False, "immediate": False},
+                             6: {"draft": "buy stamps", "confirmed": False, "later": False, "immediate": False}}
     assert account(NS, state)["undecided"] == 0
     state = replay(NS, BASE + [owner("draft", item=5, text="file the forms"), owner("unassign", item=5), owner("keep", item=5)])
     assert state["kept"][5]["draft"] is None
@@ -389,7 +389,7 @@ def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
     marked = THEMED + [owner("confirm", theme="t1"), owner("later", theme="t1", on=True)]
     state = replay(NS, marked)
     assert state["themes"]["t1"]["later"] is True and state["themes"]["t1"]["confirmed"] is True
-    assert state["kept"][6] == {"draft": None, "confirmed": False, "later": False} and state["groups"]["g1"]["later"] is False
+    assert state["kept"][6] == {"draft": None, "confirmed": False, "later": False, "immediate": False} and state["groups"]["g1"]["later"] is False
     counts = account(NS, state)
     assert (counts["later"], counts["kept"], counts["undecided"]) == (2, 2, 0)  # g1 and item 6
     assert account(NS, replay(NS, marked + [owner("assign", item=6, theme="t2")]))["later"] == 1
@@ -407,5 +407,44 @@ def test_later_on_a_theme_marks_all_of_it_and_keeps_its_undecided_items():
     (owner("later", item=5, group="g1", on=True), "takes one of"),
 ])
 def test_later_refuses_what_it_cannot_mark(entry, message):
+    with pytest.raises(LogError, match=message):
+        replay(NS, BASE + [entry])
+
+
+def test_immediate_marks_like_later_and_untags_at_the_level_it_was_set():
+    state = replay(NS, BASE + [
+        owner("confirm", group="g1"),
+        owner("immediate", group="g1", on=True),
+        owner("immediate", item=6, on=True),  # undecided, so it is kept too
+        owner("later", item=6, on=True),  # both marks at once
+    ])
+    assert state["groups"]["g1"]["immediate"] is True and state["groups"]["g1"]["confirmed"] is True
+    assert state["kept"][6] == {"draft": None, "confirmed": False, "later": True, "immediate": True}
+    counts = account(NS, state)
+    assert (counts["immediate"], counts["later"], counts["undecided"]) == (2, 1, 0)
+    state = replay(NS, BASE + [owner("immediate", group="g1", on=True), owner("immediate", group="g1", on=False)])
+    assert account(NS, state)["immediate"] == 0
+    state = replay(NS, BASE + [owner("immediate", group="g1", on=True), agent("split", group="g1", items=[1], new="g3", name="shed")])
+    assert state["groups"]["g3"]["immediate"] is True and state["groups"]["g3"]["later"] is False
+    state = replay(NS, BASE + [owner("immediate", item=5, on=True), owner("unassign", item=5), owner("keep", item=5)])
+    assert state["kept"][5]["immediate"] is False
+
+
+def test_immediate_on_a_theme_marks_all_of_it_and_untags_only_as_a_whole():
+    marked = THEMED + [owner("immediate", theme="t1", on=True)]
+    state = replay(NS, marked)
+    assert state["themes"]["t1"]["immediate"] is True and state["groups"]["g1"]["immediate"] is False
+    assert account(NS, state)["immediate"] == 2  # g1 and item 6, which it keeps
+    assert account(NS, replay(NS, marked + [owner("assign", item=6, theme="t2")]))["immediate"] == 1
+    assert account(NS, replay(NS, marked + [owner("immediate", theme="t1", on=False)]))["immediate"] == 0
+
+
+@pytest.mark.parametrize("entry, message", [
+    (owner("immediate", theme="t9", on=True), "no theme 't9'"),
+    (owner("immediate", item=1, on=True), "item 1 is in group 'g1'"),
+    (owner("immediate", item=6, on=False), "item 6 is not kept"),
+    (owner("immediate", item=5, on="yes"), "on must be true or false"),
+])
+def test_immediate_refuses_what_it_cannot_mark(entry, message):
     with pytest.raises(LogError, match=message):
         replay(NS, BASE + [entry])
