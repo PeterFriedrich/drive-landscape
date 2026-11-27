@@ -27,13 +27,14 @@ symptom and re-measure the stated cause before acting on it.
 ### Waiting on the owner
 
 - [ ] **Owner runs:** `press Sync in the claude.ai Project, ticking docs/BRIEF.md and docs/SPEC_phase1_distill.md` — PRs #52/#53 changed both, so the Claude web side is stale · confirm: `owner says synced (the Project cannot be read from here)` · low, before the next Claude web chat · since 2026-11-24
-- [ ] **Owner runs:** `merge PR #47 (S11 handoff)` — a handoff record; the owner merges · confirm: `gh pr view 47 --json state -q .state` prints MERGED · low · since 2026-11-11
 - [ ] **Owner runs:** `create the Google Cloud OAuth client on the laptop (steps in data/DATA.md), then python -m src.inventory` — the inventory has only run against a fake Drive; the Drive map waits on it · confirm: `ls data/raw/private/inventory/` shows a dated snapshot, committed in the private repo · low, the connector path covers current work · since 2026-10-05
 - [ ] **Owner runs:** `click through the notes page artifact (URL in the private repo's live/doc.json) and the Immediate controls in python -m src.ui todo-001` — neither has been clicked in a browser; only syntax and parity checks ran · confirm: `the owner reports each button works, or names the one that doesn't` · low · since 2026-11-24
 
 ## Done
 
 Closed items moved out of `## Open work` live in **`docs/TODO_archive.md`** — one line each below, reasoning there.
+
+- [x] **Owner runs: merge PR #47** — merged 2026-11-26 · `docs/TODO_archive.md`
 
 - [x] **Before the repo goes public** — 2026-10-05 · `docs/TODO_archive.md`
 
